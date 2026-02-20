@@ -1,0 +1,26 @@
+{
+    "name": "saendet/nc_ms365_calendar",
+    "description": "Nextcloud Microsoft 365 Calendar Integration",
+    "type": "project",
+    "license": "AGPL-3.0-or-later",
+    "autoload": {
+        "psr-4": {
+            "OCA\\NcMs365Calendar\\": "lib/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "OCA\\NcMs365Calendar\\Tests\\": "tests/"
+        }
+    },
+    "require": {
+        "php": ">=8.2"
+    },
+    "require-dev": {
+        "nextcloud/ocp": "^28",
+        "phpunit/phpunit": "^10"
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

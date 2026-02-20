@@ -1,0 +1,24 @@
+{
+    "name": "nc_ms365_calendar",
+    "version": "1.0.0",
+    "description": "Nextcloud Microsoft 365 Calendar Integration",
+    "private": true,
+    "scripts": {
+        "build": "webpack --node-env production",
+        "dev": "webpack --node-env development",
+        "watch": "webpack --node-env development --watch"
+    },
+    "dependencies": {
+        "@nextcloud/axios": "^2.5.0",
+        "@nextcloud/router": "^3.0.1",
+        "vue": "^3.4.0"
+    },
+    "devDependencies": {
+        "@nextcloud/babel-config": "^1.2.0",
+        "@nextcloud/browserslist-config": "^3.0.1",
+        "@nextcloud/webpack-vue-config": "^7.0.0"
+    },
+    "browserslist": [
+        "extends @nextcloud/browserslist-config"
+    ]
+}
