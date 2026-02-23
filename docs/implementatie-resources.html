@@ -84,6 +84,11 @@
     <tr><td></td><td>6.2 <a href="#fase3-resultaat">Resultaat</a></td></tr>
     <tr><td><strong>7.</strong></td><td><a href="#vergelijking">Vergelijking permissiemodellen</a></td></tr>
     <tr><td><strong>8.</strong></td><td><a href="#risicos">Risico's en mitigatie</a></td></tr>
+    <tr><td><strong>9.</strong></td><td><a href="#performance">Performance tests</a></td></tr>
+    <tr><td></td><td>9.1 <a href="#perf-aanpak">Testaanpak</a></td></tr>
+    <tr><td></td><td>9.2 <a href="#perf-resultaten">Resultaten</a></td></tr>
+    <tr><td></td><td>9.3 <a href="#perf-webhook">Webhook-verwerking</a></td></tr>
+    <tr><td></td><td>9.4 <a href="#perf-productie">Productie-overwegingen</a></td></tr>
   </tbody>
 </table>
 
@@ -663,6 +668,260 @@
     </tr>
   </tbody>
 </table>
+
+<hr class="section-divider">
+
+<!-- ============================================================
+     SECTIE 9: PERFORMANCE TESTS
+     ============================================================ -->
+<h1 id="performance">9. Performance tests</h1>
+
+<p>De RoomVox-codebase bevat een uitgebreide test suite van <strong>176 tests met 308 assertions</strong>, waaronder specifieke performance tests die de schaalbaarheid van de booking engine valideren. Alle tests slagen op PHP 8.2 en 8.3 (CI/CD via Gitea Actions).</p>
+
+<h2 id="perf-aanpak">9.1 Testaanpak</h2>
+
+<p>De performance tests meten de <strong>PHP-logica overhead</strong> met alle I/O (database, netwerk) gemockt. Timing gebeurt met <code>hrtime(true)</code> voor nanoseconde-precisie. Dit isoleert de applicatielogica van externe latency, waardoor bottlenecks in de code zelf ge&iuml;dentificeerd kunnen worden.</p>
+
+<p>De testsuite dekt drie boekingspaden:</p>
+
+<ul>
+  <li><strong>CalDAV/iTIP</strong> &mdash; het volledige scheduling-pad via het CalDAV-protocol (zoals Apple Calendar en Thunderbird)</li>
+  <li><strong>Interne API</strong> &mdash; boekingen via de Nextcloud Calendar UI</li>
+  <li><strong>Publieke API (v1)</strong> &mdash; boekingen via bearer-token API</li>
+</ul>
+
+<h2 id="perf-resultaten">9.2 Resultaten</h2>
+
+<h3>Conflictdetectie</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Test</th>
+      <th>Schaal</th>
+      <th>Tijdslimiet</th>
+      <th>Wat wordt gemeten</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Lokale conflictscan</td>
+      <td>50 events</td>
+      <td>&lt; 50 ms</td>
+      <td>Volledige CalDAV-conflictcontrole</td>
+    </tr>
+    <tr>
+      <td>Lokale conflictscan (stress)</td>
+      <td>200 events</td>
+      <td>&lt; 150 ms</td>
+      <td>Conflictdetectie onder hoge load</td>
+    </tr>
+    <tr>
+      <td>Exchange-conflictscan</td>
+      <td>50 Graph API events</td>
+      <td>&lt; 50 ms</td>
+      <td>Exchange conflict check met showAs-filtering</td>
+    </tr>
+    <tr>
+      <td>Exchange-conflictscan (stress)</td>
+      <td>200 Graph API events</td>
+      <td>&lt; 150 ms</td>
+      <td>Exchange conflict check op schaal</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Boekingsverwerking</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Test</th>
+      <th>Schaal</th>
+      <th>Tijdslimiet</th>
+      <th>Wat wordt gemeten</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Scheduling plugin (volledig pad)</td>
+      <td>1 iTIP request</td>
+      <td>&lt; 50 ms</td>
+      <td>Permissie &rarr; beschikbaarheid &rarr; horizon &rarr; conflict &rarr; levering</td>
+    </tr>
+    <tr>
+      <td>Complexe beschikbaarheidsregels</td>
+      <td>6 regels</td>
+      <td>&lt; 30 ms</td>
+      <td>iTIP met meerdere dag/tijdregels</td>
+    </tr>
+    <tr>
+      <td>Booking API (create)</td>
+      <td>1 API call</td>
+      <td>&lt; 50 ms</td>
+      <td>Volledige boekingscreatie via interne API</td>
+    </tr>
+    <tr>
+      <td>Batch boekingen</td>
+      <td>10 sequentieel</td>
+      <td>&lt; 200 ms</td>
+      <td>10 opeenvolgende boekingen</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Schaalbaarheid (ruimtebeheer)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Test</th>
+      <th>Schaal</th>
+      <th>Tijdslimiet</th>
+      <th>Wat wordt gemeten</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Room lookup</td>
+      <td>100 ruimtes</td>
+      <td>&lt; 50 ms</td>
+      <td>JSON decode van room index + roomdata</td>
+    </tr>
+    <tr>
+      <td>Room lookup (stress)</td>
+      <td>500 ruimtes</td>
+      <td>&lt; 200 ms</td>
+      <td>Ruimtelijst op grote schaal</td>
+    </tr>
+    <tr>
+      <td>CSV-import</td>
+      <td>100 rijen</td>
+      <td>&lt; 100 ms</td>
+      <td>CSV-parsing met faciliteitennormalisatie</td>
+    </tr>
+    <tr>
+      <td>CSV-import (stress)</td>
+      <td>500 rijen</td>
+      <td>&lt; 400 ms</td>
+      <td>Bulk CSV-import</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Load tests (1500 ruimtes)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Test</th>
+      <th>Schaal</th>
+      <th>Tijdslimiet</th>
+      <th>Wat wordt gemeten</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1500 boekingen via interne API</td>
+      <td>1500 ruimtes</td>
+      <td>&lt; 10 s</td>
+      <td>Auth &rarr; room lookup &rarr; permissie &rarr; conflict &rarr; create &rarr; Exchange push</td>
+    </tr>
+    <tr>
+      <td>1500 boekingen via CalDAV/iTIP</td>
+      <td>1500 ruimtes</td>
+      <td>&lt; 10 s</td>
+      <td>Volledig iTIP-pad per boeking incl. Exchange push</td>
+    </tr>
+    <tr>
+      <td>1500 boekingen met conflictcontrole</td>
+      <td>1500 ruimtes &times; 10 events</td>
+      <td>&lt; 15 s</td>
+      <td>1500 conflictscans, elk over 10 bestaande events</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-success">
+  <p><strong>Resultaat:</strong> De 1500-ruimte load tests voltooien in circa <strong>330 ms totaal</strong> (22 MB geheugen), wat neerkomt op circa <strong>0,2 ms per boeking</strong> aan PHP-logica overhead. Alle tests blijven ruim binnen de gestelde tijdslimieten.</p>
+</div>
+
+<h2 id="perf-webhook">9.3 Webhook-verwerking</h2>
+
+<p>Aparte performance tests valideren dat de webhook-handler snel genoeg reageert voor de <strong>3-seconden deadline</strong> van Microsoft Graph:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Test</th>
+      <th>Ruimtes</th>
+      <th>Max inline sync</th>
+      <th>Tijdslimiet</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Webhook-verwerking</td>
+      <td>50</td>
+      <td>1</td>
+      <td>&lt; 100 ms</td>
+    </tr>
+    <tr>
+      <td>Webhook-verwerking (stress)</td>
+      <td>300</td>
+      <td>1</td>
+      <td>&lt; 500 ms</td>
+    </tr>
+    <tr>
+      <td>Webhook-verwerking (max inline 5)</td>
+      <td>300</td>
+      <td>5</td>
+      <td>&lt; 500 ms</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>De webhook-handler verwerkt maximaal een instelbaar aantal ruimtes inline (synchroon) en plaatst de rest als achtergrondtaken in de queue. Rate limiting via distributed cache voorkomt overbelasting bij bulk-notificaties.</p>
+
+<h2 id="perf-productie">9.4 Productie-overwegingen</h2>
+
+<p>De performance tests meten uitsluitend PHP-logica. In productie komt daar I/O-latency bij:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Operatie</th>
+      <th>Verwachte latency</th>
+      <th>Toelichting</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Database: conflictcontrole</td>
+      <td>~2&ndash;5 ms</td>
+      <td>CalDAV calendarQuery op de ruimte-agenda</td>
+    </tr>
+    <tr>
+      <td>Database: boeking opslaan</td>
+      <td>~1&ndash;2 ms</td>
+      <td>CalDAV createCalendarObject</td>
+    </tr>
+    <tr>
+      <td>Exchange: push</td>
+      <td>~50&ndash;200 ms</td>
+      <td>HTTP-call naar Graph API (fail-safe, blokkeert geen respons)</td>
+    </tr>
+    <tr>
+      <td>Exchange: conflictcontrole</td>
+      <td>~50&ndash;200 ms</td>
+      <td>HTTP-call naar Graph API calendarView</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <p><strong>Totale verwachte doorlooptijd per boeking:</strong> circa <strong>55&ndash;210 ms</strong> (PHP-logica + database). De Exchange-push is fail-safe: als Exchange onbereikbaar is, wordt de boeking alsnog lokaal geaccepteerd. De synchronisatie haalt het later in via de achtergrondtaak.</p>
+</div>
 
 <hr class="section-divider">
 
