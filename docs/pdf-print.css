@@ -1,0 +1,416 @@
+/**
+ * SURF Works - PDF Print Stylesheet
+ * For use with WeasyPrint (HTML → PDF)
+ *
+ * Usage:
+ *   <link rel="stylesheet" href="../Branding/pdf-print.css">
+ *   weasyprint input.html output.pdf
+ *
+ * Based on: SURF Design System Blue palette
+ * Version: 1.0.0
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Source+Sans+3:wght@400;600;700&display=swap');
+
+/* ============================================================
+   1. PAGE SETUP
+   ============================================================ */
+
+@page {
+  size: A4;
+  margin: 25mm 20mm 25mm 20mm;
+
+  @bottom-center {
+    content: var(--pdf-footer-text, "SURF Works");
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 8pt;
+    color: #8C969F;
+  }
+
+  @bottom-right {
+    content: counter(page);
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 8pt;
+    color: #8C969F;
+  }
+}
+
+@page :first {
+  margin: 0;
+  @bottom-center { content: none; }
+  @bottom-right { content: none; }
+}
+
+/* ============================================================
+   2. RESET & BASE
+   ============================================================ */
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Source Sans 3', 'Source Sans Pro', sans-serif;
+  font-size: 10pt;
+  line-height: 1.5;
+  color: #050E1D;
+  margin: 0;
+  padding: 0;
+}
+
+/* ============================================================
+   3. COVER PAGE
+   ============================================================ */
+
+.cover {
+  width: 210mm;
+  height: 297mm;
+  background: #004C97;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0;
+  page-break-after: always;
+  position: relative;
+  overflow: hidden;
+}
+
+.cover-accent {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 40%;
+  background: linear-gradient(135deg, #0077C8 0%, #0077C8 50%, transparent 50%);
+}
+
+.cover-content {
+  padding: 40mm 25mm 50mm 25mm;
+  position: relative;
+  z-index: 1;
+}
+
+.cover-logo {
+  margin-bottom: 8mm;
+}
+
+.cover-logo img {
+  height: 18mm;
+}
+
+.cover-title {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 32pt;
+  line-height: 1.15;
+  margin-bottom: 8mm;
+  color: white;
+}
+
+.cover-subtitle {
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: 14pt;
+  font-weight: 400;
+  color: #B3E5FF;
+  margin-bottom: 15mm;
+}
+
+.cover-meta {
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: 10pt;
+  color: #78BEFD;
+  line-height: 1.8;
+}
+
+.cover-meta strong {
+  color: #B3E5FF;
+}
+
+/* ============================================================
+   4. TYPOGRAPHY
+   ============================================================ */
+
+h1 {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 20pt;
+  color: #0077C8;
+  margin-top: 0;
+  margin-bottom: 5mm;
+  padding-bottom: 3mm;
+  border-bottom: 2px solid #0077C8;
+  page-break-after: avoid;
+}
+
+h2 {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 13pt;
+  color: #050E1D;
+  margin-top: 8mm;
+  margin-bottom: 3mm;
+  page-break-after: avoid;
+}
+
+h3 {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 11pt;
+  color: #333;
+  margin-top: 5mm;
+  margin-bottom: 2mm;
+  page-break-after: avoid;
+}
+
+h4 {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 600;
+  font-size: 10pt;
+  color: #050E1D;
+  margin-top: 4mm;
+  margin-bottom: 2mm;
+  page-break-after: avoid;
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: 3mm;
+}
+
+ul, ol {
+  margin-top: 0;
+  margin-bottom: 3mm;
+  padding-left: 6mm;
+}
+
+li {
+  margin-bottom: 1mm;
+}
+
+strong {
+  font-weight: 700;
+}
+
+a {
+  color: #0077C8;
+  text-decoration: none;
+}
+
+/* ============================================================
+   5. TABLES
+   ============================================================ */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 3mm;
+  margin-bottom: 5mm;
+  font-size: 9pt;
+  page-break-inside: avoid;
+}
+
+thead th {
+  background: #0077C8;
+  color: white;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 9pt;
+  padding: 2.5mm 3mm;
+  text-align: left;
+  border: none;
+}
+
+thead th:first-child {
+  border-radius: 4px 0 0 0;
+}
+
+thead th:last-child {
+  border-radius: 0 4px 0 0;
+}
+
+tbody td {
+  padding: 2mm 3mm;
+  border-bottom: 0.5pt solid #EAECF0;
+  vertical-align: top;
+}
+
+tbody tr:nth-child(even) {
+  background: #F4F6F8;
+}
+
+tbody tr:last-child td:first-child {
+  border-radius: 0 0 0 4px;
+}
+
+tbody tr:last-child td:last-child {
+  border-radius: 0 0 4px 0;
+}
+
+/* Dark header variant (for summary tables) */
+.table-dark thead th {
+  background: #004C97;
+}
+
+/* ============================================================
+   6. CALLOUT BOXES
+   ============================================================ */
+
+.callout {
+  background: #DFF4FF;
+  border-left: 4px solid #0077C8;
+  padding: 4mm 5mm;
+  margin: 4mm 0;
+  border-radius: 0 4px 4px 0;
+  page-break-inside: avoid;
+}
+
+.callout p {
+  margin: 0;
+}
+
+.callout p + p {
+  margin-top: 2mm;
+}
+
+.callout-success {
+  background: #DCF2E5;
+  border-left-color: #008939;
+}
+
+.callout-warning {
+  background: #FFE6D2;
+  border-left-color: #E67300;
+}
+
+.callout-error {
+  background: #FFE5E3;
+  border-left-color: #DA362D;
+}
+
+/* ============================================================
+   7. TOELICHTING / EXPLANATION BLOCKS
+   ============================================================ */
+
+.toelichting {
+  background: #F4F6F8;
+  padding: 4mm 5mm;
+  border-radius: 4px;
+  margin: 3mm 0 5mm 0;
+  border: 0.5pt solid #EAECF0;
+  page-break-inside: avoid;
+}
+
+.toelichting p {
+  margin-bottom: 1.5mm;
+}
+
+.toelichting p:last-child {
+  margin-bottom: 0;
+}
+
+/* ============================================================
+   8. LAYER BLOCKS (for support models, architecture diagrams)
+   ============================================================ */
+
+.layer {
+  margin-bottom: 4mm;
+  page-break-inside: avoid;
+}
+
+.layer-title {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 10pt;
+  color: #0077C8;
+  margin-bottom: 1mm;
+}
+
+.layer ul {
+  margin-top: 1mm;
+}
+
+/* ============================================================
+   9. SECTION DIVIDERS
+   ============================================================ */
+
+.section-divider {
+  border: none;
+  border-top: 1px solid #EAECF0;
+  margin: 8mm 0;
+}
+
+/* ============================================================
+   10. PAGE BREAKS
+   ============================================================ */
+
+.page-break {
+  page-break-before: always;
+}
+
+.avoid-break {
+  page-break-inside: avoid;
+}
+
+/* ============================================================
+   11. REFERENCES
+   ============================================================ */
+
+.references {
+  font-size: 8.5pt;
+  color: #5E6873;
+}
+
+.references a {
+  color: #0077C8;
+  text-decoration: none;
+}
+
+.references h2,
+.references h3 {
+  font-size: 9pt;
+  color: #5E6873;
+}
+
+/* ============================================================
+   12. TWO-COLUMN LAYOUT (for side-by-side content)
+   ============================================================ */
+
+.columns {
+  display: flex;
+  gap: 5mm;
+}
+
+.columns > * {
+  flex: 1;
+}
+
+/* ============================================================
+   13. BADGES / TAGS
+   ============================================================ */
+
+.badge {
+  display: inline-block;
+  padding: 0.5mm 2mm;
+  font-size: 7.5pt;
+  font-weight: 700;
+  border-radius: 2mm;
+  background: #0077C8;
+  color: white;
+}
+
+.badge-success {
+  background: #008939;
+}
+
+.badge-warning {
+  background: #E67300;
+  color: #050E1D;
+}
+
+.badge-error {
+  background: #DA362D;
+}
+
+.badge-neutral {
+  background: #EAECF0;
+  color: #050E1D;
+}
