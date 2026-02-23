@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Implementatie Resources - MS365 Calendar &amp; RoomVox</title>
+<link rel="stylesheet" href="pdf-print.css">
+<style>
+  @page {
+    @bottom-center {
+      content: "SURF Works - Implementatie Resources";
+    }
+  }
+  .phase-box {
+    border: 2px solid #0077C8;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 12px 0;
+    background: #f0f7fc;
+    page-break-inside: avoid;
+  }
+  .phase-box h3 {
+    margin-top: 0;
+    color: #0077C8;
+  }
+  .flow-arrow {
+    text-align: center;
+    font-size: 1.4em;
+    color: #0077C8;
+    margin: 4px 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     COVER PAGE
+     ============================================================ -->
+<div class="cover">
+  <div class="cover-accent"></div>
+  <div class="cover-content">
+    <div class="cover-logo">
+      <img src="SURF-works-diap.svg" alt="SURF Works">
+    </div>
+    <div class="cover-title">Implementatie<br>Resources</div>
+    <div class="cover-subtitle">Gefaseerde aanpak voor het beschikbaar maken van ruimtes in Nextcloud Calendar via MS365 Calendar Integration en RoomVox</div>
+    <div class="cover-meta">
+      <strong>Status:</strong> Concept<br>
+      <strong>Datum:</strong> Februari 2026<br>
+      <strong>Versie:</strong> 1.0.0<br>
+      <strong>Classificatie:</strong> Intern
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     CONTENT
+     ============================================================ -->
+<div class="content">
+
+<!-- INHOUDSOPGAVE -->
+<h1>Inhoudsopgave</h1>
+
+<table>
+  <tbody>
+    <tr><td><strong>1.</strong></td><td><a href="#samenvatting">Management samenvatting</a></td></tr>
+    <tr><td><strong>2.</strong></td><td><a href="#uitgangspunten">Uitgangspunten en architectuurkeuzes</a></td></tr>
+    <tr><td></td><td>2.1 <a href="#twee-apps">Twee apps, &eacute;&eacute;n doel</a></td></tr>
+    <tr><td></td><td>2.2 <a href="#app-permissions">Application permissions vs. delegated permissions</a></td></tr>
+    <tr><td></td><td>2.3 <a href="#onafhankelijkheid">Onafhankelijkheid van Exchange resources</a></td></tr>
+    <tr><td></td><td>2.4 <a href="#exit-strategie">Exit-strategie</a></td></tr>
+    <tr><td><strong>3.</strong></td><td><a href="#fase-overzicht">Faseoverzicht</a></td></tr>
+    <tr><td><strong>4.</strong></td><td><a href="#fase1">Fase 1 &mdash; MS365 Calendar Integration (resources vindbaar maken)</a></td></tr>
+    <tr><td></td><td>4.1 <a href="#fase1-werking">Werking</a></td></tr>
+    <tr><td></td><td>4.2 <a href="#fase1-permissions">Benodigde machtigingen</a></td></tr>
+    <tr><td></td><td>4.3 <a href="#fase1-resultaat">Resultaat</a></td></tr>
+    <tr><td><strong>5.</strong></td><td><a href="#fase2">Fase 2 &mdash; RoomVox (resources boekbaar maken)</a></td></tr>
+    <tr><td></td><td>5.1 <a href="#fase2-architectuur">Architectuur</a></td></tr>
+    <tr><td></td><td>5.2 <a href="#fase2-exchange-sync">Exchange-synchronisatie</a></td></tr>
+    <tr><td></td><td>5.3 <a href="#fase2-permissions">Benodigde machtigingen</a></td></tr>
+    <tr><td></td><td>5.4 <a href="#fase2-beveiliging">Beveiliging</a></td></tr>
+    <tr><td></td><td>5.5 <a href="#fase2-resultaat">Resultaat</a></td></tr>
+    <tr><td><strong>6.</strong></td><td><a href="#fase3">Fase 3 &mdash; Autonome werking (exit Exchange)</a></td></tr>
+    <tr><td></td><td>6.1 <a href="#fase3-stappen">Stappen</a></td></tr>
+    <tr><td></td><td>6.2 <a href="#fase3-resultaat">Resultaat</a></td></tr>
+    <tr><td><strong>7.</strong></td><td><a href="#vergelijking">Vergelijking permissiemodellen</a></td></tr>
+    <tr><td><strong>8.</strong></td><td><a href="#risicos">Risico's en mitigatie</a></td></tr>
+  </tbody>
+</table>
+
+<hr class="section-divider">
+
+<!-- ============================================================
+     SECTIE 1: MANAGEMENT SAMENVATTING
+     ============================================================ -->
+<h1 id="samenvatting">1. Management samenvatting</h1>
+
+<p>Dit document beschrijft de gefaseerde aanpak voor het beschikbaar maken van <strong>vergaderruimtes</strong> (resources) in de Nextcloud Calendar. De implementatie verloopt in drie fasen:</p>
+
+<div class="phase-box">
+  <h3>Fase 1 &mdash; Vindbaar maken (MS365 Calendar Integration)</h3>
+  <p>De bestaande MS365 Calendar Integration app maakt Exchange-resources <strong>vindbaar</strong> voor Nextcloud-gebruikers. Ruimtes verschijnen in zoekresultaten en hun beschikbaarheid (free/busy) is direct zichtbaar in de Calendar. Machtigingen zijn <strong>delegated</strong> &mdash; per gebruiker, alleen lezen.</p>
+</div>
+
+<div class="flow-arrow">&darr;</div>
+
+<div class="phase-box">
+  <h3>Fase 2 &mdash; Boekbaar maken (RoomVox)</h3>
+  <p>RoomVox is een CalDAV-native room booking app die ruimtes als <strong>boekbare resources</strong> aanbiedt. Agenda's van Exchange-resources worden gesynchroniseerd zodat conflicten worden voorkomen. RoomVox gebruikt <strong>application permissions</strong> &mdash; een bewuste architectuurkeuze die de app onafhankelijk maakt van de Exchange-resourcestructuur.</p>
+</div>
+
+<div class="flow-arrow">&darr;</div>
+
+<div class="phase-box">
+  <h3>Fase 3 &mdash; Autonome werking (exit Exchange)</h3>
+  <p>Door de Exchange-synchronisatie uit te schakelen wordt RoomVox de <strong>enige bron van waarheid</strong> voor ruimteboekingen. Dit is de exit-strategie: geen afhankelijkheid meer van Exchange.</p>
+</div>
+
+<hr class="section-divider">
+
+<!-- ============================================================
+     SECTIE 2: UITGANGSPUNTEN
+     ============================================================ -->
+<h1 id="uitgangspunten">2. Uitgangspunten en architectuurkeuzes</h1>
+
+<h2 id="twee-apps">2.1 Twee apps, &eacute;&eacute;n doel</h2>
+
+<p>Het beschikbaar maken van resources in Nextcloud gebeurt met twee aparte Nextcloud-apps die elk een specifieke rol vervullen:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>App</th>
+      <th>Rol</th>
+      <th>Permissiemodel</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>MS365 Calendar Integration</strong></td>
+      <td>Resources <em>vindbaar</em> maken (zoeken + free/busy)</td>
+      <td>Delegated permissions (per gebruiker)</td>
+    </tr>
+    <tr>
+      <td><strong>RoomVox</strong></td>
+      <td>Resources <em>boekbaar</em> maken (CalDAV room resources)</td>
+      <td>Application permissions (server-niveau)</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>De scheiding is bewust: de MS365 Calendar Integration werkt namens individuele gebruikers en is daarmee beperkt tot wat die gebruikers zelf mogen zien. RoomVox opereert als server-applicatie en kan daardoor alle ruimte-agenda's beheren, ongeacht welke gebruiker een boeking maakt.</p>
+
+<h2 id="app-permissions">2.2 Application permissions vs. delegated permissions</h2>
+
+<p>RoomVox gebruikt <strong>application permissions</strong> (OAuth2 client credentials grant). Dit is een bewuste architectuurkeuze met de volgende overwegingen:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Aspect</th>
+      <th>Delegated permissions</th>
+      <th>Application permissions (RoomVox)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Authenticatie</strong></td>
+      <td>Elke gebruiker logt individueel in</td>
+      <td>E&eacute;nmalige configuratie door beheerder</td>
+    </tr>
+    <tr>
+      <td><strong>Scope</strong></td>
+      <td>Alleen agenda's die de gebruiker zelf mag zien</td>
+      <td>Alle ruimte-agenda's van de organisatie</td>
+    </tr>
+    <tr>
+      <td><strong>Afhankelijkheid</strong></td>
+      <td>Gebonden aan gebruikerssessies en persoonlijke tokens</td>
+      <td>Onafhankelijk van individuele gebruikers</td>
+    </tr>
+    <tr>
+      <td><strong>Achtergrondtaken</strong></td>
+      <td>Niet mogelijk (vereist actieve gebruikerssessie)</td>
+      <td>Volledig ondersteund (cronjobs, webhooks)</td>
+    </tr>
+    <tr>
+      <td><strong>Schaalbaar</strong></td>
+      <td>Token per gebruiker per ruimte</td>
+      <td>E&eacute;n token voor alle ruimtes</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <p><strong>Kernpunt:</strong> Bidirectionele agenda-synchronisatie vereist dat de server op elk moment &mdash; ook buiten gebruikerssessies om &mdash; kan lezen en schrijven op Exchange-agenda's. Delegated permissions ondersteunen dit niet, omdat ze afhankelijk zijn van een actieve gebruikerscontext. Application permissions zijn hiervoor de enige optie.</p>
+</div>
+
+<h2 id="onafhankelijkheid">2.3 Onafhankelijkheid van Exchange resources</h2>
+
+<p>Een belangrijk architectuurprincipe is dat RoomVox <strong>niet afhankelijk is van de Exchange-resourcestructuur</strong>. De app synchroniseert uitsluitend <em>agenda's</em> (calendars), niet de Exchange-resourcedefinities zelf.</p>
+
+<p>Dit betekent:</p>
+
+<ul>
+  <li>Ruimtes worden in RoomVox <strong>handmatig of via CSV-import</strong> aangemaakt met eigen metadata (naam, capaciteit, faciliteiten, locatie)</li>
+  <li>Per ruimte wordt optioneel een <strong>Exchange resource e-mailadres</strong> gekoppeld voor agenda-synchronisatie</li>
+  <li>De Exchange-koppeling is een <em>synchronisatiekanaal</em>, geen bron van de ruimtedefinitie</li>
+  <li>Als Exchange wegvalt, behoudt RoomVox alle ruimte-informatie en boekingen</li>
+</ul>
+
+<div class="callout callout-success">
+  <p><strong>Alleen agenda's worden gesynchroniseerd.</strong> Ruimtedefinities, capaciteiten, faciliteiten en andere metadata worden in RoomVox beheerd. Exchange is alleen de bron voor bestaande boekingen die buiten Nextcloud zijn gemaakt.</p>
+</div>
+
+<h2 id="exit-strategie">2.4 Exit-strategie</h2>
+
+<p>Door het ontwerp is de exit-strategie eenvoudig:</p>
+
+<ol>
+  <li>Schakel de Exchange-synchronisatie uit (per ruimte of globaal)</li>
+  <li>RoomVox wordt de enige bron van waarheid voor alle boekingen</li>
+  <li>Bestaande boekingen blijven behouden in de CalDAV-agenda's</li>
+  <li>Optioneel: verwijder de Azure AD app registration</li>
+</ol>
+
+<p>Er is geen datamigratie nodig. Alle boekingen die via de synchronisatie zijn binnengekomen, staan al als reguliere CalDAV-events in de ruimte-agenda's van RoomVox.</p>
+
+<hr class="section-divider">
+
+<!-- ============================================================
+     SECTIE 3: FASEOVERZICHT
+     ============================================================ -->
+<h1 id="fase-overzicht">3. Faseoverzicht</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>Fase</th>
+      <th>Omschrijving</th>
+      <th>App</th>
+      <th>Vereist</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>1</strong></td>
+      <td>Resources vindbaar maken in Nextcloud Calendar (zoeken + free/busy)</td>
+      <td>MS365 Calendar Integration</td>
+      <td>Entra ID App Registration (delegated permissions)</td>
+    </tr>
+    <tr>
+      <td><strong>2</strong></td>
+      <td>Resources boekbaar maken als CalDAV room resources met Exchange-synchronisatie</td>
+      <td>RoomVox</td>
+      <td>Entra ID App Registration (application permissions)</td>
+    </tr>
+    <tr>
+      <td><strong>3</strong></td>
+      <td>Autonome werking &mdash; Exchange-synchronisatie uitschakelen</td>
+      <td>RoomVox</td>
+      <td>Geen externe afhankelijkheden</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <p><strong>Let op:</strong> Fase 1 en Fase 2 gebruiken <strong>aparte App Registrations</strong> in Microsoft Entra ID met verschillende permissiemodellen. Dit is een bewuste scheiding: de MS365 Calendar Integration werkt met delegated permissions (per gebruiker), RoomVox met application permissions (server-niveau).</p>
+</div>
+
+<hr class="section-divider">
+
+<!-- ============================================================
+     SECTIE 4: FASE 1
+     ============================================================ -->
+<h1 id="fase1">4. Fase 1 &mdash; MS365 Calendar Integration</h1>
+
+<p>In deze fase wordt de <strong>MS365 Calendar Integration</strong> app ge&iuml;nstalleerd. Hiermee worden Exchange-resources (vergaderruimtes) vindbaar voor Nextcloud-gebruikers.</p>
+
+<h2 id="fase1-werking">4.1 Werking</h2>
+
+<p>De app registreert een <strong>virtueel adresboek</strong> en een <strong>Sabre DAV plugin</strong> in Nextcloud. Hierdoor kunnen gebruikers:</p>
+
+<ul>
+  <li><strong>Zoeken naar resources</strong> &mdash; Exchange room resources verschijnen in de deelnemerslijst bij het aanmaken van een agenda-item. De app doorzoekt Microsoft Graph met meerdere strategie&euml;n (People API, Users API op naam/e-mail, fallback met prefix-matching).</li>
+  <li><strong>Beschikbaarheid bekijken</strong> &mdash; Free/busy informatie van resources wordt realtime opgehaald via de Graph API (<code>/me/calendar/getSchedule</code>) en weergegeven in de Nextcloud Calendar planning view.</li>
+</ul>
+
+<p>Beide functies werken transparant via het <strong>CalDAV-protocol</strong>, waardoor ze ook beschikbaar zijn in externe clients zoals Apple Calendar en Thunderbird.</p>
+
+<h2 id="fase1-permissions">4.2 Benodigde machtigingen</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Machtiging</th>
+      <th>Type</th>
+      <th>Doel</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>User.ReadBasic.All</code></td>
+      <td>Delegated</td>
+      <td>Gebruikers en resources zoeken in de directory</td>
+    </tr>
+    <tr>
+      <td><code>People.Read</code></td>
+      <td>Delegated</td>
+      <td>Relevante contacten ophalen</td>
+    </tr>
+    <tr>
+      <td><code>Calendars.Read</code></td>
+      <td>Delegated</td>
+      <td>Free/busy informatie opvragen</td>
+    </tr>
+    <tr>
+      <td><code>Calendars.Read.Shared</code></td>
+      <td>Delegated</td>
+      <td>Free/busy voor gedeelde agenda's en resources</td>
+    </tr>
+    <tr>
+      <td><code>offline_access</code></td>
+      <td>Delegated</td>
+      <td>Refresh tokens voor langdurige sessies</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-success">
+  <p><strong>Alleen leestoegang:</strong> De MS365 Calendar Integration vraagt uitsluitend <em>read</em>-machtigingen op. Er worden geen agenda-items, contacten of gebruikersgegevens gewijzigd in Microsoft 365.</p>
+</div>
+
+<h2 id="fase1-resultaat">4.3 Resultaat</h2>
+
+<p>Na Fase 1 kunnen Nextcloud-gebruikers Exchange-resources vinden en hun beschikbaarheid bekijken. <strong>Boeken is nog niet mogelijk</strong> &mdash; hiervoor is Fase 2 (RoomVox) nodig. De resources verschijnen als contacten in de deelnemerslijst, niet als CalDAV room resources.</p>
+
+<hr class="section-divider">
+
+<!-- ============================================================
+     SECTIE 5: FASE 2
+     ============================================================ -->
+<h1 id="fase2">5. Fase 2 &mdash; RoomVox</h1>
+
+<p>In deze fase wordt <strong>RoomVox</strong> ge&iuml;nstalleerd. Dit is een CalDAV-native room booking app die ruimtes als boekbare resources beschikbaar maakt in Nextcloud Calendar en alle CalDAV-clients.</p>
+
+<h2 id="fase2-architectuur">5.1 Architectuur</h2>
+
+<p>RoomVox maakt voor elke ruimte een <strong>verborgen Nextcloud-gebruikersaccount</strong> aan (prefix <code>rb_</code>). Dit account bezit een CalDAV-agenda en fungeert als <em>principal</em> voor het CalDAV scheduling-protocol. De accounts zijn onzichtbaar in zoekresultaten en login is altijd geblokkeerd.</p>
+
+<p>De app registreert een <strong>Sabre DAV SchedulingPlugin</strong> die iTIP-berichten (REQUEST/CANCEL) onderschept voor ruimte-principals. Bij elke boeking wordt:</p>
+
+<ol>
+  <li><strong>Permissie</strong> gecontroleerd (Viewer / Booker / Manager rollen)</li>
+  <li><strong>Beschikbaarheid</strong> gevalideerd (dag/tijdregels, boekingshorizon)</li>
+  <li><strong>Conflicten</strong> gedetecteerd &mdash; zowel in de lokale CalDAV-agenda als in Exchange (als synchronisatie actief is)</li>
+  <li>De boeking <strong>automatisch geaccepteerd</strong> of op <em>tentative</em> gezet</li>
+  <li>De boeking <strong>naar Exchange gepusht</strong> (synchrone, fail-safe operatie)</li>
+  <li><strong>E-mailnotificatie</strong> verstuurd aan beheerders</li>
+</ol>
+
+<p>Omdat ruimtes CalDAV room resources zijn, verschijnen ze automatisch in de <strong>ruimte-selector</strong> van Nextcloud Calendar, Apple Calendar en andere CalDAV-clients.</p>
+
+<h2 id="fase2-exchange-sync">5.2 Exchange-synchronisatie</h2>
+
+<p>RoomVox synchroniseert <strong>uitsluitend agenda's</strong> (geen ruimtedefinities, geen metadata). De synchronisatie is <strong>bidirectioneel</strong>:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Richting</th>
+      <th>Trigger</th>
+      <th>Werking</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>RoomVox &rarr; Exchange</strong></td>
+      <td>Boeking via Nextcloud</td>
+      <td>Direct (synchroon) gepusht naar Exchange via Graph API. Het event krijgt een <code>RoomVoxSyncSource</code> extended property om echolussen te voorkomen.</td>
+    </tr>
+    <tr>
+      <td><strong>Exchange &rarr; RoomVox</strong></td>
+      <td>Webhook-notificatie of achtergrondtaak (elke 15 min)</td>
+      <td>Delta-queries halen alleen gewijzigde events op. Nieuwe boekingen worden als CalDAV-events aangemaakt met <code>X-ROOMVOX-SYNC-SOURCE: exchange</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Echopreventie</h3>
+
+<p>Om oneindige synchronisatielussen te voorkomen, gebruikt RoomVox een dubbel metadata-mechanisme:</p>
+
+<ul>
+  <li><strong>iCal custom properties</strong>: <code>X-ROOMVOX-SYNC-SOURCE</code> (waarde: <code>roomvox</code> of <code>exchange</code>) en <code>X-EXCHANGE-EVENT-ID</code> in de CalDAV VEVENT</li>
+  <li><strong>Exchange extended properties</strong>: <code>RoomVoxSyncSource</code> en <code>RoomVoxUID</code> op Exchange-events via de Graph API</li>
+</ul>
+
+<p>Bij het pushen wordt een boeking met brontype <code>exchange</code> overgeslagen. Bij het pullen wordt een Exchange-event met brontype <code>roomvox</code> overgeslagen.</p>
+
+<h3>Webhooks</h3>
+
+<p>Voor near-realtime synchronisatie maakt RoomVox gebruik van <strong>Microsoft Graph webhooks</strong>. De webhook-subscriptions worden automatisch vernieuwd (maximale levensduur: 2 dagen) door een achtergrondtaak. Een periodieke synchronisatietaak (elke 15 minuten) fungeert als <strong>vangnet</strong> voor het geval webhooks mislukken.</p>
+
+<h2 id="fase2-permissions">5.3 Benodigde machtigingen</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Machtiging</th>
+      <th>Type</th>
+      <th>Doel</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>Calendars.ReadWrite</code></td>
+      <td>Application</td>
+      <td>Lezen en schrijven van ruimte-agenda's voor bidirectionele synchronisatie</td>
+    </tr>
+    <tr>
+      <td><code>User.Read.All</code></td>
+      <td>Application</td>
+      <td>Valideren van resource e-mailadressen bij configuratie</td>
+    </tr>
+    <tr>
+      <td><code>Organization.Read.All</code></td>
+      <td>Application</td>
+      <td>Testen van de Exchange-verbinding</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-warning">
+  <p><strong>Belangrijk:</strong> Application permissions vereisen <strong>admin consent</strong>. Een Microsoft 365 Global Administrator moet de machtigingen goedkeuren. Deze machtigingen geven de applicatie toegang tot <em>alle</em> agenda's in de tenant. Het wordt aanbevolen om via Entra ID <strong>Application Access Policies</strong> de scope te beperken tot alleen de benodigde ruimte-resources.</p>
+</div>
+
+<h2 id="fase2-beveiliging">5.4 Beveiliging</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Aspect</th>
+      <th>Implementatie</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Client secret</strong></td>
+      <td>Versleuteld opgeslagen via Nextcloud <code>IAppConfig</code> (sensitive flag)</td>
+    </tr>
+    <tr>
+      <td><strong>Token-caching</strong></td>
+      <td>Access tokens worden server-side gecachet met 60 seconden marge voor verlopen</td>
+    </tr>
+    <tr>
+      <td><strong>Webhook-validatie</strong></td>
+      <td>Elke webhook-subscription heeft een 64-karakter cryptografisch willekeurig <code>clientState</code> dat bij elke notificatie gevalideerd wordt</td>
+    </tr>
+    <tr>
+      <td><strong>Rate limiting</strong></td>
+      <td>Webhook-verwerking is rate-limited via distributed cache om thundering herd te voorkomen</td>
+    </tr>
+    <tr>
+      <td><strong>SMTP-wachtwoorden</strong></td>
+      <td>Versleuteld opgeslagen via Nextcloud <code>ICrypto</code></td>
+    </tr>
+    <tr>
+      <td><strong>Graceful degradation</strong></td>
+      <td>Als Exchange niet bereikbaar is, blijft RoomVox volledig functioneel als standalone room booking systeem. Conflictcontrole valt terug op alleen de lokale agenda.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="fase2-resultaat">5.5 Resultaat</h2>
+
+<p>Na Fase 2 zijn ruimtes <strong>volledig boekbaar</strong> vanuit Nextcloud Calendar, Apple Calendar, Thunderbird en andere CalDAV-clients. Boekingen worden automatisch gesynchroniseerd met Exchange, zodat:</p>
+
+<ul>
+  <li>Boekingen in Nextcloud direct zichtbaar zijn in Exchange</li>
+  <li>Boekingen in Exchange (bijv. via Outlook) automatisch in Nextcloud verschijnen</li>
+  <li>Dubbele boekingen worden voorkomen door conflictcontrole op beide systemen</li>
+</ul>
+
+<hr class="section-divider">
+
+<!-- ============================================================
+     SECTIE 6: FASE 3
+     ============================================================ -->
+<h1 id="fase3">6. Fase 3 &mdash; Autonome werking</h1>
+
+<p>Fase 3 is de <strong>exit-strategie</strong>: het uitschakelen van de Exchange-synchronisatie, waardoor RoomVox de enige bron van waarheid wordt voor alle ruimteboekingen.</p>
+
+<h2 id="fase3-stappen">6.1 Stappen</h2>
+
+<ol>
+  <li><strong>Schakel Exchange-synchronisatie uit</strong> &mdash; dit kan per ruimte of globaal via de admin-instellingen van RoomVox</li>
+  <li><strong>Verifieer bestaande boekingen</strong> &mdash; alle eerder gesynchroniseerde boekingen staan al als reguliere CalDAV-events in de ruimte-agenda's en blijven behouden</li>
+  <li><strong>Optioneel: verwijder de Azure AD app registration</strong> &mdash; de application permissions zijn niet langer nodig</li>
+  <li><strong>Optioneel: verwijder de Exchange-configuratie</strong> per ruimte (resource e-mailadres, sync-instellingen)</li>
+</ol>
+
+<div class="callout callout-success">
+  <p><strong>Geen datamigratie nodig.</strong> Omdat RoomVox ruimtedefinities en boekingen in eigen opslag beheert (Nextcloud <code>IAppConfig</code> en CalDAV-agenda's), gaat er niets verloren bij het uitschakelen van Exchange. De agenda's draaien gewoon door.</p>
+</div>
+
+<h2 id="fase3-resultaat">6.2 Resultaat</h2>
+
+<p>Na Fase 3 is RoomVox een <strong>volledig zelfstandig room booking systeem</strong> zonder externe afhankelijkheden:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Functie</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Ruimtes beheren (CRUD, CSV-import/-export)</td>
+      <td>Volledig operationeel</td>
+    </tr>
+    <tr>
+      <td>Boeken via Nextcloud Calendar</td>
+      <td>Volledig operationeel</td>
+    </tr>
+    <tr>
+      <td>Boeken via Apple Calendar, Thunderbird, etc.</td>
+      <td>Volledig operationeel (CalDAV)</td>
+    </tr>
+    <tr>
+      <td>Permissies (Viewer / Booker / Manager)</td>
+      <td>Volledig operationeel</td>
+    </tr>
+    <tr>
+      <td>Beschikbaarheidsregels (dag/tijd, boekingshorizon)</td>
+      <td>Volledig operationeel</td>
+    </tr>
+    <tr>
+      <td>E-mailnotificaties</td>
+      <td>Volledig operationeel</td>
+    </tr>
+    <tr>
+      <td>Publieke API (v1)</td>
+      <td>Volledig operationeel</td>
+    </tr>
+    <tr>
+      <td>Exchange-synchronisatie</td>
+      <td>Uitgeschakeld</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr class="section-divider">
+
+<!-- ============================================================
+     SECTIE 7: VERGELIJKING
+     ============================================================ -->
+<h1 id="vergelijking">7. Vergelijking permissiemodellen</h1>
+
+<p>De twee apps gebruiken fundamenteel verschillende permissiemodellen. Dit is een bewuste ontwerpkeuze die voortvloeit uit de verschillende functionele vereisten:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Kenmerk</th>
+      <th>MS365 Calendar Integration</th>
+      <th>RoomVox</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>OAuth2-grant</strong></td>
+      <td>Authorization Code Flow + PKCE</td>
+      <td>Client Credentials Grant</td>
+    </tr>
+    <tr>
+      <td><strong>Permissietype</strong></td>
+      <td>Delegated</td>
+      <td>Application</td>
+    </tr>
+    <tr>
+      <td><strong>Authenticatie door</strong></td>
+      <td>Elke gebruiker individueel</td>
+      <td>Beheerder, eenmalig</td>
+    </tr>
+    <tr>
+      <td><strong>Leestoegang</strong></td>
+      <td>Alleen wat de gebruiker zelf mag zien</td>
+      <td>Alle geconfigureerde ruimte-agenda's</td>
+    </tr>
+    <tr>
+      <td><strong>Schrijftoegang</strong></td>
+      <td>Geen</td>
+      <td>Ja (boekingen aanmaken/wijzigen/verwijderen)</td>
+    </tr>
+    <tr>
+      <td><strong>Achtergrondverwerking</strong></td>
+      <td>Niet mogelijk</td>
+      <td>Ja (cronjobs, webhooks)</td>
+    </tr>
+    <tr>
+      <td><strong>Token-opslag</strong></td>
+      <td>Per gebruiker (ICrypto-versleuteld)</td>
+      <td>Eenmalig, server-niveau (IAppConfig sensitive)</td>
+    </tr>
+    <tr>
+      <td><strong>Admin consent</strong></td>
+      <td>Alleen voor <code>User.ReadBasic.All</code></td>
+      <td>Voor alle machtigingen</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <p><strong>Waarom twee App Registrations?</strong> De MS365 Calendar Integration heeft alleen delegated (read-only) permissions nodig. Het toevoegen van application (read-write) permissions aan dezelfde registration zou het principe van least privilege schenden en de blast radius bij een eventueel security incident onnodig vergroten. Door de registraties te scheiden, blijft elke app beperkt tot precies de machtigingen die nodig zijn.</p>
+</div>
+
+<hr class="section-divider">
+
+<!-- ============================================================
+     SECTIE 8: RISICO'S
+     ============================================================ -->
+<h1 id="risicos">8. Risico's en mitigatie</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>Risico</th>
+      <th>Impact</th>
+      <th>Mitigatie</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Application permissions bieden brede toegang</strong></td>
+      <td>Bij compromittering van het client secret kan een aanvaller alle agenda's in de tenant lezen/schrijven</td>
+      <td>Gebruik Application Access Policies in Entra ID om de scope te beperken tot ruimte-resources. Roteer het client secret periodiek. Monitor sign-in logs.</td>
+    </tr>
+    <tr>
+      <td><strong>Exchange-webhook mist events</strong></td>
+      <td>Boekingen gemaakt in Exchange verschijnen niet direct in RoomVox</td>
+      <td>Achtergrondtaak (elke 15 minuten) fungeert als vangnet. Webhooks worden elke 24 uur automatisch vernieuwd.</td>
+    </tr>
+    <tr>
+      <td><strong>Synchronisatielus (echo)</strong></td>
+      <td>Oneindige loop van push/pull operaties</td>
+      <td>Dubbel metadata-mechanisme (iCal custom properties + Exchange extended properties) voorkomt echo's. Events worden bij de bron getagd.</td>
+    </tr>
+    <tr>
+      <td><strong>Exchange onbereikbaar tijdens boeking</strong></td>
+      <td>Conflictcontrole onvolledig</td>
+      <td>Graceful degradation: boeking wordt geaccepteerd op basis van alleen de lokale agenda. Synchronisatie haalt gemiste events later op.</td>
+    </tr>
+    <tr>
+      <td><strong>Dubbele boeking in overgangsperiode</strong></td>
+      <td>Zelfde ruimte geboekt in zowel Exchange als Nextcloud voordat sync voltooid is</td>
+      <td>Conflictcontrole bij boeking raadpleegt Exchange realtime. Webhook-latency is doorgaans &lt; 1 minuut.</td>
+    </tr>
+    <tr>
+      <td><strong>Client secret verloopt</strong></td>
+      <td>Synchronisatie stopt</td>
+      <td>Monitoring via RoomVox admin panel (sync status). Aanbeveling: stel een herinnering in voor de verlooptermijn.</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr class="section-divider">
+
+<!-- REFERENTIES -->
+<div class="references">
+<h2>Referenties</h2>
+<ul>
+  <li><a href="https://portal.azure.com">Microsoft Azure Portal</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/graph/overview">Microsoft Graph API documentatie</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/graph/auth-v2-service">Microsoft Graph &mdash; App-only access</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/graph/auth/auth-concepts#microsoft-graph-permissions">Microsoft Graph &mdash; Permissions reference</a></li>
+  <li><a href="https://gitea.rikdekker.nl/sam/nc_ms365_calendar">MS365 Calendar Integration &mdash; source code</a></li>
+  <li><a href="https://gitea.rikdekker.nl/rik/RoomVox">RoomVox &mdash; source code</a></li>
+</ul>
+</div>
+
+</div>
+</body>
+</html>
