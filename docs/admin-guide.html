@@ -66,6 +66,21 @@
       <li><a href="#freebusy">Beschikbaarheid (Free/Busy)</a></li>
     </ol>
   </li>
+  <li><a href="#architectuur">Technische architectuur</a>
+    <ol>
+      <li><a href="#oauth-flow">OAuth2-authenticatiestroom</a></li>
+      <li><a href="#graph-api">Microsoft Graph API-communicatie</a></li>
+      <li><a href="#caching">Caching</a></li>
+    </ol>
+  </li>
+  <li><a href="#beveiliging">Beveiliging</a>
+    <ol>
+      <li><a href="#token-opslag">Token-opslag en versleuteling</a></li>
+      <li><a href="#least-privilege">Least privilege</a></li>
+      <li><a href="#netwerk">Netwerkbeveiliging</a></li>
+      <li><a href="#foutafhandeling">Foutafhandeling en logging</a></li>
+    </ol>
+  </li>
   <li><a href="#troubleshooting">Probleemoplossing</a></li>
 </ol>
 
@@ -471,8 +486,324 @@
 
 <hr class="section-divider">
 
-<!-- SECTIE 6: TROUBLESHOOTING -->
-<h1 id="troubleshooting">6. Probleemoplossing</h1>
+<!-- SECTIE 6: TECHNISCHE ARCHITECTUUR -->
+<h1 id="architectuur">6. Technische architectuur</h1>
+
+<p>Dit hoofdstuk beschrijft de technische werking van de app voor beheerders die willen begrijpen hoe data stroomt tussen Nextcloud, de gebruiker en Microsoft 365.</p>
+
+<!-- 6.1 OAuth Flow -->
+<h2 id="oauth-flow">6.1 OAuth2-authenticatiestroom</h2>
+
+<p>De app gebruikt <strong>OAuth 2.0 Authorization Code Flow met PKCE</strong> (Proof Key for Code Exchange) voor authenticatie met Microsoft Entra ID. PKCE is een uitbreiding op het standaard OAuth-protocol die beschermt tegen onderschepping van de autorisatiecode.</p>
+
+<h3>Stroom</h3>
+
+<ol>
+  <li>Gebruiker klikt op <strong>Connect to Microsoft 365</strong> in persoonlijke instellingen</li>
+  <li>De app genereert een cryptografisch willekeurige <strong>code verifier</strong> (64 bytes) en een <strong>state parameter</strong> (32 bytes)</li>
+  <li>Een <strong>code challenge</strong> (SHA-256 hash van de verifier) wordt meegestuurd naar Microsoft</li>
+  <li>Gebruiker logt in bij Microsoft en verleent toestemming</li>
+  <li>Microsoft stuurt een <strong>autorisatiecode</strong> terug naar de Nextcloud callback-URL</li>
+  <li>De app valideert de <strong>state parameter</strong> (CSRF-bescherming) en wisselt de code + verifier in voor tokens</li>
+  <li>Tokens worden versleuteld opgeslagen (zie sectie 7.1)</li>
+</ol>
+
+<div class="toelichting">
+  <p><strong>Waarom PKCE?</strong> Bij standaard OAuth kan een kwaadwillende app op hetzelfde apparaat de autorisatiecode onderscheppen. Met PKCE kan alleen de partij die de oorspronkelijke code verifier bezit de code inwisselen voor tokens. De verifier wordt nooit via het netwerk verstuurd &mdash; alleen de SHA-256 hash.</p>
+</div>
+
+<h3>Token-levenscyclus</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Token</th>
+      <th>Levensduur</th>
+      <th>Vernieuwing</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Access token</strong></td>
+      <td>Circa 1 uur (bepaald door Microsoft)</td>
+      <td>Automatisch vernieuwd 5 minuten voor verlopen</td>
+    </tr>
+    <tr>
+      <td><strong>Refresh token</strong></td>
+      <td>90 dagen (standaard Microsoft-beleid)</td>
+      <td>Vernieuwd bij elk gebruik; verlopen vereist hernieuwde koppeling</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <p><strong>Let op:</strong> Als een refresh token verloopt of wordt ingetrokken (bijv. door een Microsoft-beheerder), moet de gebruiker opnieuw koppelen via Persoonlijke instellingen. De app detecteert dit automatisch en toont de juiste status.</p>
+</div>
+
+<!-- 6.2 Graph API -->
+<h2 id="graph-api">6.2 Microsoft Graph API-communicatie</h2>
+
+<p>Alle communicatie met Microsoft 365 verloopt via de <strong>Microsoft Graph REST API</strong> (<code>https://graph.microsoft.com/v1.0</code>). De app maakt gebruik van de volgende endpoints:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Endpoint</th>
+      <th>Methode</th>
+      <th>Doel</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>/me/people</code></td>
+      <td>GET</td>
+      <td>Zoeken naar vaak gecontacteerde personen</td>
+    </tr>
+    <tr>
+      <td><code>/users</code></td>
+      <td>GET</td>
+      <td>Zoeken naar gebruikers op naam of e-mailadres</td>
+    </tr>
+    <tr>
+      <td><code>/users/{id}/photo/$value</code></td>
+      <td>GET</td>
+      <td>Profielfoto ophalen</td>
+    </tr>
+    <tr>
+      <td><code>/me/calendar/getSchedule</code></td>
+      <td>POST</td>
+      <td>Beschikbaarheid opvragen (free/busy)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Foutafhandeling en herhaalpogingen</h3>
+
+<p>De app implementeert robuuste foutafhandeling voor API-communicatie:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>HTTP-status</th>
+      <th>Reactie</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>401</strong> Unauthorized</td>
+      <td>Token automatisch vernieuwd, verzoek opnieuw geprobeerd (max 1x)</td>
+    </tr>
+    <tr>
+      <td><strong>429</strong> Too Many Requests</td>
+      <td>Wacht op <code>Retry-After</code> header, exponential backoff</td>
+    </tr>
+    <tr>
+      <td><strong>503/504</strong> Service Unavailable</td>
+      <td>Exponential backoff: 1s, 2s, 4s (max 3 pogingen)</td>
+    </tr>
+    <tr>
+      <td><strong>403</strong> Forbidden</td>
+      <td>Geen herhaalpogingen; machtiging ontbreekt (zie sectie 3.2)</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- 6.3 Caching -->
+<h2 id="caching">6.3 Caching</h2>
+
+<p>De app cachet resultaten om het aantal API-aanroepen te beperken en de prestaties te verbeteren:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Data</th>
+      <th>TTL</th>
+      <th>Toelichting</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Zoekresultaten</strong></td>
+      <td>5 minuten (instelbaar via Cache TTL)</td>
+      <td>Per gebruiker, per zoekterm</td>
+    </tr>
+    <tr>
+      <td><strong>Free/busy</strong></td>
+      <td>2 minuten</td>
+      <td>Per gebruiker, per e-mailadres, per tijdvenster</td>
+    </tr>
+    <tr>
+      <td><strong>Profielfoto's</strong></td>
+      <td>24 uur</td>
+      <td>Per MS365-gebruiker</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="toelichting">
+  <p><strong>Aanbeveling:</strong> Voor Nextcloud-installaties met meerdere servers wordt een distributed cache aanbevolen (Redis of Memcached). Zonder distributed cache worden zoekresultaten per server gecachet, wat leidt tot meer API-aanroepen.</p>
+</div>
+
+<hr class="section-divider">
+
+<!-- SECTIE 7: BEVEILIGING -->
+<h1 id="beveiliging">7. Beveiliging</h1>
+
+<p>Dit hoofdstuk beschrijft de beveiligingsmaatregelen die de app implementeert om gebruikersgegevens en tokens te beschermen.</p>
+
+<!-- 7.1 Token-opslag -->
+<h2 id="token-opslag">7.1 Token-opslag en versleuteling</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Aspect</th>
+      <th>Implementatie</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Access token</strong></td>
+      <td>Versleuteld opgeslagen met Nextcloud <code>ICrypto</code></td>
+    </tr>
+    <tr>
+      <td><strong>Refresh token</strong></td>
+      <td>Versleuteld opgeslagen met Nextcloud <code>ICrypto</code></td>
+    </tr>
+    <tr>
+      <td><strong>Client Secret</strong></td>
+      <td>Opgeslagen als <em>sensitive</em> app-configuratie (versleuteld door Nextcloud)</td>
+    </tr>
+    <tr>
+      <td><strong>PKCE-verifier</strong></td>
+      <td>Alleen in server-side sessie; wordt na gebruik direct verwijderd</td>
+    </tr>
+    <tr>
+      <td><strong>State parameter</strong></td>
+      <td>Alleen in server-side sessie; wordt na validatie direct verwijderd</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <p><strong>Let op:</strong> De versleuteling is afhankelijk van de Nextcloud <code>secret</code> in <code>config.php</code>. Zorg ervoor dat deze sleutel veilig bewaard wordt en onderdeel is van uw backup-strategie. Als deze sleutel verloren gaat, moeten alle gebruikers opnieuw koppelen.</p>
+</div>
+
+<p>Bij het ophalen van instellingen via de admin-interface wordt het Client Secret <strong>gemaskeerd</strong> weergegeven (<code>********</code>). Het opslaan van een gemaskeerde waarde wordt automatisch genegeerd, zodat het bestaande secret niet overschreven wordt.</p>
+
+<!-- 7.2 Least Privilege -->
+<h2 id="least-privilege">7.2 Least privilege</h2>
+
+<p>De app is ontworpen volgens het <strong>principe van minimale rechten</strong>:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Principe</th>
+      <th>Implementatie</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Delegated permissions</strong></td>
+      <td>Alle API-machtigingen zijn <em>delegated</em>, niet <em>application</em>. De app kan nooit meer dan waartoe de gebruiker zelf gemachtigd is</td>
+    </tr>
+    <tr>
+      <td><strong>Alleen lezen</strong></td>
+      <td>De app vraagt uitsluitend leesmachtigingen op (<code>Read</code>). Er worden geen agenda-items, contacten of gebruikersgegevens gewijzigd in Microsoft 365</td>
+    </tr>
+    <tr>
+      <td><strong>Single tenant</strong></td>
+      <td>De App Registration is beperkt tot uw eigen organisatie. Gebruikers van andere tenants kunnen de app niet gebruiken</td>
+    </tr>
+    <tr>
+      <td><strong>Per-gebruiker tokens</strong></td>
+      <td>Elke gebruiker heeft eigen tokens. Er is geen gedeelde service-account met brede toegang</td>
+    </tr>
+    <tr>
+      <td><strong>Read-only adresboek</strong></td>
+      <td>Het MS365-adresboek in Nextcloud is read-only. Er kunnen geen contacten worden aangemaakt, gewijzigd of verwijderd</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- 7.3 Netwerk -->
+<h2 id="netwerk">7.3 Netwerkbeveiliging</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Aspect</th>
+      <th>Implementatie</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Transport</strong></td>
+      <td>Alle communicatie met Microsoft via HTTPS/TLS (afgedwongen door Microsoft Graph API)</td>
+    </tr>
+    <tr>
+      <td><strong>CSRF-bescherming</strong></td>
+      <td>OAuth state parameter (32 bytes, cryptografisch willekeurig) voorkomt cross-site request forgery</td>
+    </tr>
+    <tr>
+      <td><strong>XXE-preventie</strong></td>
+      <td>XML-parsing gebruikt <code>LIBXML_NONET | LIBXML_NOENT</code> vlaggen om externe entiteiten en netwerktoegang te blokkeren</td>
+    </tr>
+    <tr>
+      <td><strong>Uitgaand verkeer</strong></td>
+      <td>De server maakt alleen verbinding met <code>login.microsoftonline.com</code> en <code>graph.microsoft.com</code> (poort 443)</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="toelichting">
+  <p><strong>Firewall-configuratie:</strong> Als uw Nextcloud-server achter een firewall staat, zorg dan dat uitgaand HTTPS-verkeer (poort 443) is toegestaan naar:</p>
+  <ul>
+    <li><code>login.microsoftonline.com</code> &mdash; OAuth-authenticatie</li>
+    <li><code>graph.microsoft.com</code> &mdash; Microsoft Graph API</li>
+  </ul>
+  <p>Er is geen inkomend verkeer van Microsoft nodig.</p>
+</div>
+
+<!-- 7.4 Foutafhandeling -->
+<h2 id="foutafhandeling">7.4 Foutafhandeling en logging</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Aspect</th>
+      <th>Implementatie</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Gevoelige data in logs</strong></td>
+      <td>Tokens, secrets en gebruikersgegevens worden <strong>nooit</strong> gelogd. Alleen endpoints, HTTP-statuscodes en foutcategorie&euml;n worden vastgelegd</td>
+    </tr>
+    <tr>
+      <td><strong>Foutmeldingen naar gebruiker</strong></td>
+      <td>Gebruikers zien generieke foutmeldingen; technische details staan alleen in de serverlog</td>
+    </tr>
+    <tr>
+      <td><strong>Token-intrekking</strong></td>
+      <td>Bij een HTTP 401 tijdens token-refresh wordt de gebruiker automatisch ontkoppeld en moeten alle tokens opnieuw worden aangemaakt</td>
+    </tr>
+    <tr>
+      <td><strong>Mislukte decryptie</strong></td>
+      <td>Als token-decryptie mislukt (bijv. na sleutelwijziging) wordt een leeg resultaat geretourneerd en de fout gelogd, zonder crash</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-success">
+  <p><strong>Samenvatting:</strong> De app slaat geen wachtwoorden op, gebruikt alleen versleutelde tokens, communiceert uitsluitend via HTTPS, en kan geen gegevens wijzigen in Microsoft 365. Elke gebruiker autoriseert individueel en kan de koppeling op elk moment verbreken.</p>
+</div>
+
+<hr class="section-divider">
+
+<!-- SECTIE 8: TROUBLESHOOTING -->
+<h1 id="troubleshooting">8. Probleemoplossing</h1>
 
 <table class="table-dark">
   <thead>
