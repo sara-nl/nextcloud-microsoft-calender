@@ -44,22 +44,6 @@
 
 <ol>
   <li><a href="#overzicht">Overzicht</a></li>
-  <li><a href="#vereisten">Vereisten</a></li>
-  <li><a href="#azure-setup">Microsoft Entra ID configuratie</a>
-    <ol>
-      <li><a href="#app-registration">App Registration aanmaken</a></li>
-      <li><a href="#api-permissions">API-machtigingen instellen</a></li>
-      <li><a href="#client-secret">Client Secret aanmaken</a></li>
-      <li><a href="#ids">Tenant ID en Client ID noteren</a></li>
-    </ol>
-  </li>
-  <li><a href="#nextcloud-config">Nextcloud configuratie</a>
-    <ol>
-      <li><a href="#app-install">App installeren</a></li>
-      <li><a href="#admin-settings">Beheerdersinstellingen</a></li>
-      <li><a href="#user-connection">Gebruikerskoppeling</a></li>
-    </ol>
-  </li>
   <li><a href="#werking">Werking</a>
     <ol>
       <li><a href="#attendee-search">Deelnemers zoeken</a></li>
@@ -81,15 +65,33 @@
       <li><a href="#foutafhandeling">Foutafhandeling en logging</a></li>
     </ol>
   </li>
+  <li><a href="#vereisten">Vereisten</a></li>
+  <li><a href="#azure-setup">Microsoft Entra ID configuratie</a>
+    <ol>
+      <li><a href="#app-registration">App Registration aanmaken</a></li>
+      <li><a href="#api-permissions">API-machtigingen instellen</a></li>
+      <li><a href="#client-secret">Client Secret aanmaken</a></li>
+      <li><a href="#ids">Tenant ID en Client ID noteren</a></li>
+    </ol>
+  </li>
+  <li><a href="#nextcloud-config">Nextcloud configuratie</a>
+    <ol>
+      <li><a href="#app-install">App installeren</a></li>
+      <li><a href="#admin-settings">Beheerdersinstellingen</a></li>
+      <li><a href="#user-connection">Gebruikerskoppeling</a></li>
+    </ol>
+  </li>
   <li><a href="#troubleshooting">Probleemoplossing</a></li>
 </ol>
 
 <hr class="section-divider">
 
-<!-- SECTIE 1: OVERZICHT -->
+<!-- ============================================================
+     SECTIE 1: OVERZICHT
+     ============================================================ -->
 <h1 id="overzicht">1. Overzicht</h1>
 
-<p>De <strong>Microsoft 365 Calendar Integration</strong> app voor Nextcloud maakt het mogelijk om Microsoft 365 gebruikers te zoeken en toe te voegen als deelnemers aan agenda-items in de Nextcloud Calendar. Daarnaast wordt de beschikbaarheid (free/busy) van MS365-gebruikers direct zichtbaar in de Nextcloud Calendar.</p>
+<p>De <strong>Microsoft 365 Calendar Integration</strong> is een Nextcloud-app die de Microsoft 365 directory en agendagegevens beschikbaar maakt in de Nextcloud Calendar. Hierdoor kunnen gebruikers MS365-collega's zoeken als deelnemers en hun beschikbaarheid (free/busy) direct inzien &mdash; zonder Nextcloud te verlaten.</p>
 
 <h2>Functionaliteiten</h2>
 
@@ -120,330 +122,83 @@
   </tbody>
 </table>
 
-<div class="callout">
-  <p><strong>Let op:</strong> Elke Nextcloud-gebruiker koppelt individueel zijn/haar eigen Microsoft 365-account. Er is geen centrale service-account nodig.</p>
-</div>
-
-<hr class="section-divider">
-
-<!-- SECTIE 2: VEREISTEN -->
-<h1 id="vereisten">2. Vereisten</h1>
+<h2>Technische stack</h2>
 
 <table>
   <thead>
     <tr>
       <th>Component</th>
-      <th>Minimaal</th>
-      <th>Opmerking</th>
+      <th>Technologie</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td><strong>Nextcloud</strong></td>
-      <td>28</td>
-      <td>Ondersteund t/m versie 33</td>
+      <td><strong>Backend</strong></td>
+      <td>PHP 8.2+ (Nextcloud App Framework)</td>
     </tr>
     <tr>
-      <td><strong>PHP</strong></td>
-      <td>8.2</td>
-      <td></td>
+      <td><strong>Frontend</strong></td>
+      <td>Vue.js (Nextcloud Vue components)</td>
     </tr>
     <tr>
-      <td><strong>Microsoft Entra ID</strong></td>
-      <td>&mdash;</td>
-      <td>Een App Registration in uw Microsoft-tenant</td>
+      <td><strong>Authenticatie</strong></td>
+      <td>OAuth 2.0 Authorization Code Flow met PKCE</td>
     </tr>
     <tr>
-      <td><strong>Netwerk</strong></td>
-      <td>&mdash;</td>
-      <td>Nextcloud-server moet <code>graph.microsoft.com</code> en <code>login.microsoftonline.com</code> kunnen bereiken</td>
+      <td><strong>API</strong></td>
+      <td>Microsoft Graph REST API v1.0</td>
+    </tr>
+    <tr>
+      <td><strong>CalDAV-integratie</strong></td>
+      <td>Sabre DAV plugin (free/busy) + Nextcloud IAddressBook (zoeken)</td>
+    </tr>
+    <tr>
+      <td><strong>Token-opslag</strong></td>
+      <td>Versleuteld via Nextcloud ICrypto, per gebruiker</td>
     </tr>
   </tbody>
 </table>
-
-<hr class="section-divider">
-
-<!-- SECTIE 3: AZURE SETUP -->
-<h1 id="azure-setup">3. Microsoft Entra ID configuratie</h1>
-
-<p>Onderstaande stappen worden uitgevoerd door een <strong>Microsoft 365 beheerder</strong> met toegang tot de Azure Portal.</p>
-
-<!-- 3.1 App Registration -->
-<h2 id="app-registration">3.1 App Registration aanmaken</h2>
-
-<ol>
-  <li>Ga naar de <a href="https://portal.azure.com">Azure Portal</a></li>
-  <li>Navigeer naar <strong>Microsoft Entra ID</strong> &rarr; <strong>App registrations</strong> &rarr; <strong>New registration</strong></li>
-  <li>Vul de volgende gegevens in:</li>
-</ol>
-
-<table>
-  <thead>
-    <tr>
-      <th>Veld</th>
-      <th>Waarde</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><strong>Name</strong></td>
-      <td><code>Nextcloud Calendar Integration</code> (of een beschrijvende naam naar keuze)</td>
-    </tr>
-    <tr>
-      <td><strong>Supported account types</strong></td>
-      <td><em>Accounts in this organizational directory only</em> (Single tenant)</td>
-    </tr>
-    <tr>
-      <td><strong>Redirect URI</strong></td>
-      <td>Platform: <strong>Web</strong><br>URI: <code>https://&lt;uw-nextcloud-domein&gt;/apps/nc_ms365_calendar/oauth/callback</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<div class="callout callout-warning">
-  <p><strong>Belangrijk:</strong> De Redirect URI moet exact overeenkomen met het domein van uw Nextcloud-installatie. Vervang <code>&lt;uw-nextcloud-domein&gt;</code> door het werkelijke domein, bijvoorbeeld: <code>https://cloud.organisatie.nl/apps/nc_ms365_calendar/oauth/callback</code></p>
-</div>
-
-<ol start="4">
-  <li>Klik op <strong>Register</strong></li>
-</ol>
-
-<!-- 3.2 API Permissions -->
-<h2 id="api-permissions">3.2 API-machtigingen instellen</h2>
-
-<p>Na het aanmaken van de App Registration moeten de juiste API-machtigingen worden toegevoegd:</p>
-
-<ol>
-  <li>Ga naar uw App Registration &rarr; <strong>API permissions</strong> &rarr; <strong>Add a permission</strong></li>
-  <li>Kies <strong>Microsoft Graph</strong> &rarr; <strong>Delegated permissions</strong></li>
-  <li>Voeg de volgende machtigingen toe:</li>
-</ol>
-
-<table>
-  <thead>
-    <tr>
-      <th>Machtiging</th>
-      <th>Doel</th>
-      <th>Admin Consent</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><strong>User.ReadBasic.All</strong></td>
-      <td>Gebruikers zoeken in de directory</td>
-      <td><span class="badge badge-warning">Vereist</span></td>
-    </tr>
-    <tr>
-      <td><strong>People.Read</strong></td>
-      <td>Relevante contacten ophalen</td>
-      <td><span class="badge badge-neutral">Nee</span></td>
-    </tr>
-    <tr>
-      <td><strong>Calendars.Read</strong></td>
-      <td>Free/busy informatie opvragen</td>
-      <td><span class="badge badge-neutral">Nee</span></td>
-    </tr>
-    <tr>
-      <td><strong>Calendars.Read.Shared</strong></td>
-      <td>Free/busy voor gedeelde agenda's</td>
-      <td><span class="badge badge-neutral">Nee</span></td>
-    </tr>
-    <tr>
-      <td><strong>offline_access</strong></td>
-      <td>Refresh tokens voor langdurige sessies</td>
-      <td><span class="badge badge-neutral">Nee</span></td>
-    </tr>
-  </tbody>
-</table>
-
-<ol start="4">
-  <li>Klik op <strong>Grant admin consent for [uw organisatie]</strong></li>
-  <li>Bevestig met <strong>Yes</strong></li>
-</ol>
 
 <div class="callout">
-  <p><strong>Let op:</strong> De machtiging <code>User.ReadBasic.All</code> vereist admin consent. Zonder deze goedkeuring kunnen gebruikers geen MS365-collega's zoeken als deelnemers.</p>
-</div>
-
-<div class="toelichting">
-  <p><strong>Toelichting op de machtigingen:</strong> Alle machtigingen zijn van het type <em>Delegated</em>, wat betekent dat ze werken namens de ingelogde gebruiker. De app kan nooit meer doen dan waartoe de gebruiker zelf gemachtigd is. Er worden geen <em>Application</em>-machtigingen gebruikt.</p>
-</div>
-
-<!-- 3.3 Client Secret -->
-<h2 id="client-secret">3.3 Client Secret aanmaken</h2>
-
-<ol>
-  <li>Ga naar uw App Registration &rarr; <strong>Certificates &amp; secrets</strong></li>
-  <li>Klik op <strong>New client secret</strong></li>
-  <li>Voer een beschrijving in (bijv. <code>Nextcloud Calendar</code>) en kies een verlooptermijn</li>
-  <li><strong>Kopieer de secret value onmiddellijk</strong> &mdash; deze wordt slechts eenmaal weergegeven</li>
-</ol>
-
-<div class="callout callout-error">
-  <p><strong>Waarschuwing:</strong> De Client Secret wordt na het aanmaken slechts eenmaal getoond. Sla deze veilig op. Als u de waarde kwijtraakt, moet u een nieuwe secret aanmaken.</p>
-</div>
-
-<div class="toelichting">
-  <p><strong>Aanbeveling:</strong> Stel een herinnering in voor de verlooptermijn van het secret. Na verlopen moet een nieuw secret worden aangemaakt en in Nextcloud worden bijgewerkt. Een verlopen secret zorgt ervoor dat gebruikers hun MS365-account niet meer kunnen koppelen.</p>
-</div>
-
-<!-- 3.4 IDs noteren -->
-<h2 id="ids">3.4 Tenant ID en Client ID noteren</h2>
-
-<p>Ga naar uw App Registration &rarr; <strong>Overview</strong> en noteer de volgende waarden:</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Veld</th>
-      <th>Waar te vinden</th>
-      <th>Voorbeeld</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><strong>Tenant ID</strong></td>
-      <td>Overview &rarr; Directory (tenant) ID</td>
-      <td><code>a1b2c3d4-e5f6-7890-abcd-ef1234567890</code></td>
-    </tr>
-    <tr>
-      <td><strong>Client ID</strong></td>
-      <td>Overview &rarr; Application (client) ID</td>
-      <td><code>12345678-abcd-efgh-ijkl-123456789012</code></td>
-    </tr>
-    <tr>
-      <td><strong>Client Secret</strong></td>
-      <td>Certificates &amp; secrets (stap 3.3)</td>
-      <td><code>uw-gekopieerde-secret-waarde</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<div class="callout callout-success">
-  <p><strong>Klaar!</strong> U heeft nu alle gegevens die nodig zijn voor de Nextcloud-configuratie: Tenant ID, Client ID en Client Secret.</p>
+  <p><strong>Let op:</strong> Elke Nextcloud-gebruiker koppelt individueel zijn/haar eigen Microsoft 365-account. Er is geen centrale service-account nodig &mdash; de app werkt uitsluitend met delegated permissions namens de ingelogde gebruiker.</p>
 </div>
 
 <hr class="section-divider">
 
-<!-- SECTIE 4: NEXTCLOUD CONFIGURATIE -->
-<h1 id="nextcloud-config">4. Nextcloud configuratie</h1>
+<!-- ============================================================
+     SECTIE 2: WERKING
+     ============================================================ -->
+<h1 id="werking">2. Werking</h1>
 
-<!-- 4.1 App installeren -->
-<h2 id="app-install">4.1 App installeren</h2>
+<!-- 2.1 Deelnemers zoeken -->
+<h2 id="attendee-search">2.1 Deelnemers zoeken</h2>
 
-<p>De app wordt geinstalleerd door de Nextcloud-beheerder:</p>
+<p>Wanneer een gebruiker deelnemers zoekt in de Nextcloud Calendar, worden automatisch ook Microsoft 365 gebruikers doorzocht. De app registreert een <strong>virtueel adresboek</strong> via de Nextcloud Contacts Manager. Dit adresboek wordt transparant doorzocht wanneer de Calendar-app om contacten vraagt.</p>
+
+<h3>Zoekstrategie</h3>
+
+<p>De app doorzoekt Microsoft Graph met meerdere strategie&euml;n parallel om de beste resultaten te leveren:</p>
 
 <ol>
-  <li>Kloon de repository in de Nextcloud <code>apps/</code> directory:
-    <div class="toelichting">
-      <p><code>cd /var/www/nextcloud/apps</code><br>
-      <code>git clone https://gitea.rikdekker.nl/sam/nc_ms365_calendar.git</code></p>
-    </div>
-  </li>
-  <li>Installeer dependencies en bouw de frontend:
-    <div class="toelichting">
-      <p><code>cd nc_ms365_calendar</code><br>
-      <code>composer install --no-dev</code><br>
-      <code>npm install</code><br>
-      <code>npm run build</code></p>
-    </div>
-  </li>
-  <li>Activeer de app:
-    <div class="toelichting">
-      <p><code>occ app:enable nc_ms365_calendar</code></p>
-    </div>
-  </li>
+  <li><strong>People API</strong> (<code>/me/people</code>) &mdash; vindt vaak gecontacteerde personen op basis van communicatiepatronen</li>
+  <li><strong>Users API op naam</strong> (<code>/users?$search="displayName:..."</code>) &mdash; doorzoekt de directory op weergavenaam</li>
+  <li><strong>Users API op e-mail</strong> (<code>/users?$search="mail:..."</code>) &mdash; doorzoekt op e-mailadres</li>
+  <li><strong>Fallback</strong> (<code>/users?$filter=startsWith(...)</code>) &mdash; prefix-matching als $search geen resultaten geeft</li>
 </ol>
 
-<!-- 4.2 Beheerdersinstellingen -->
-<h2 id="admin-settings">4.2 Beheerdersinstellingen</h2>
+<p>Resultaten worden samengevoegd, gedupliceerden verwijderd op basis van e-mailadres, en gecachet (standaard 5 minuten). Profielfoto's worden apart opgehaald en 24 uur gecachet.</p>
 
-<p>Ga naar <strong>Beheer</strong> &rarr; <strong>Microsoft 365 Calendar Integration</strong> en vul de volgende velden in:</p>
+<!-- 2.2 Free/Busy -->
+<h2 id="freebusy">2.2 Beschikbaarheid (Free/Busy)</h2>
 
-<table>
-  <thead>
-    <tr>
-      <th>Veld</th>
-      <th>Waarde</th>
-      <th>Toelichting</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><strong>Tenant ID</strong></td>
-      <td>Uw Microsoft Entra ID Tenant ID</td>
-      <td>Zie stap 3.4</td>
-    </tr>
-    <tr>
-      <td><strong>Client ID</strong></td>
-      <td>Het Application (client) ID van uw App Registration</td>
-      <td>Zie stap 3.4</td>
-    </tr>
-    <tr>
-      <td><strong>Client Secret</strong></td>
-      <td>Het client secret van uw App Registration</td>
-      <td>Zie stap 3.3</td>
-    </tr>
-    <tr>
-      <td><strong>Cache TTL</strong></td>
-      <td>300 (standaard)</td>
-      <td>Hoe lang zoekresultaten gecachet worden in seconden (60&ndash;3600)</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Klik op <strong>Save</strong> om de instellingen op te slaan.</p>
-
-<div class="toelichting">
-  <p><strong>Redirect URI:</strong> Op de instellingenpagina wordt automatisch de juiste Redirect URI getoond. Controleer of deze overeenkomt met wat u in stap 3.1 heeft ingesteld in de Azure Portal.</p>
-</div>
-
-<!-- 4.3 Gebruikerskoppeling -->
-<h2 id="user-connection">4.3 Gebruikerskoppeling</h2>
-
-<p>Elke gebruiker koppelt zelf zijn/haar Microsoft 365-account:</p>
+<p>De app registreert een <strong>Sabre DAV plugin</strong> die CalDAV free/busy-verzoeken onderschept. Wanneer een gebruiker de beschikbaarheid van deelnemers bekijkt, gebeurt het volgende:</p>
 
 <ol>
-  <li>Ga naar <strong>Persoonlijke instellingen</strong> &rarr; <strong>Microsoft 365 Calendar</strong></li>
-  <li>Klik op <strong>Connect to Microsoft 365</strong></li>
-  <li>Log in met uw Microsoft-account en verleen de gevraagde machtigingen</li>
-  <li>Na succesvolle koppeling wordt de status weergegeven</li>
-</ol>
-
-<div class="callout">
-  <p><strong>Let op:</strong> Gebruikers moeten individueel inloggen met hun eigen Microsoft 365-account. De app slaat per gebruiker een versleuteld OAuth-token op.</p>
-</div>
-
-<hr class="section-divider">
-
-<!-- SECTIE 5: WERKING -->
-<h1 id="werking">5. Werking</h1>
-
-<!-- 5.1 Deelnemers zoeken -->
-<h2 id="attendee-search">5.1 Deelnemers zoeken</h2>
-
-<p>Wanneer een gebruiker deelnemers zoekt in de Nextcloud Calendar, worden automatisch ook Microsoft 365 gebruikers doorzocht:</p>
-
-<ol>
-  <li>De app doorzoekt de <strong>People API</strong> voor vaak gecontacteerde personen</li>
-  <li>Parallel wordt de <strong>Users API</strong> doorzocht op weergavenaam en e-mailadres</li>
-  <li>Resultaten worden samengevoegd, gedupliceerden verwijderd en gecachet (standaard 5 minuten)</li>
-</ol>
-
-<div class="toelichting">
-  <p><strong>Technisch:</strong> De app registreert een virtueel adresboek via de Nextcloud Contacts Manager. Dit adresboek wordt automatisch doorzocht wanneer de Calendar-app om contacten vraagt.</p>
-</div>
-
-<!-- 5.2 Free/Busy -->
-<h2 id="freebusy">5.2 Beschikbaarheid (Free/Busy)</h2>
-
-<p>De beschikbaarheid van MS365-gebruikers wordt automatisch weergegeven in de Nextcloud Calendar:</p>
-
-<ol>
-  <li>De app registreert een Sabre DAV plugin die CalDAV free/busy-verzoeken onderschept</li>
-  <li>Externe deelnemers (niet in Nextcloud) worden geidentificeerd</li>
-  <li>De Microsoft Graph API (<code>/me/calendar/getSchedule</code>) wordt bevraagd</li>
-  <li>MS365-beschikbaarheid wordt samengevoegd met de Nextcloud-response</li>
+  <li>Het CalDAV free/busy-verzoek (POST naar <code>/outbox</code>) wordt onderschept</li>
+  <li>Nextcloud verwerkt eerst de <strong>lokale gebruikers</strong> (reguliere CalDAV-afhandeling)</li>
+  <li>De plugin identificeert <strong>externe deelnemers</strong> (niet in Nextcloud) en bevraagt de Microsoft Graph API (<code>/me/calendar/getSchedule</code>)</li>
+  <li>MS365-beschikbaarheid wordt <strong>samengevoegd</strong> met het Nextcloud-antwoord</li>
+  <li>Het gecombineerde resultaat wordt teruggegeven aan de Calendar-client</li>
 </ol>
 
 <h3>Statusmapping</h3>
@@ -486,13 +241,13 @@
 
 <hr class="section-divider">
 
-<!-- SECTIE 6: TECHNISCHE ARCHITECTUUR -->
-<h1 id="architectuur">6. Technische architectuur</h1>
+<!-- ============================================================
+     SECTIE 3: TECHNISCHE ARCHITECTUUR
+     ============================================================ -->
+<h1 id="architectuur">3. Technische architectuur</h1>
 
-<p>Dit hoofdstuk beschrijft de technische werking van de app voor beheerders die willen begrijpen hoe data stroomt tussen Nextcloud, de gebruiker en Microsoft 365.</p>
-
-<!-- 6.1 OAuth Flow -->
-<h2 id="oauth-flow">6.1 OAuth2-authenticatiestroom</h2>
+<!-- 3.1 OAuth Flow -->
+<h2 id="oauth-flow">3.1 OAuth2-authenticatiestroom</h2>
 
 <p>De app gebruikt <strong>OAuth 2.0 Authorization Code Flow met PKCE</strong> (Proof Key for Code Exchange) voor authenticatie met Microsoft Entra ID. PKCE is een uitbreiding op het standaard OAuth-protocol die beschermt tegen onderschepping van de autorisatiecode.</p>
 
@@ -505,7 +260,7 @@
   <li>Gebruiker logt in bij Microsoft en verleent toestemming</li>
   <li>Microsoft stuurt een <strong>autorisatiecode</strong> terug naar de Nextcloud callback-URL</li>
   <li>De app valideert de <strong>state parameter</strong> (CSRF-bescherming) en wisselt de code + verifier in voor tokens</li>
-  <li>Tokens worden versleuteld opgeslagen (zie sectie 7.1)</li>
+  <li>Tokens worden versleuteld opgeslagen (zie sectie 4.1)</li>
 </ol>
 
 <div class="toelichting">
@@ -540,8 +295,8 @@
   <p><strong>Let op:</strong> Als een refresh token verloopt of wordt ingetrokken (bijv. door een Microsoft-beheerder), moet de gebruiker opnieuw koppelen via Persoonlijke instellingen. De app detecteert dit automatisch en toont de juiste status.</p>
 </div>
 
-<!-- 6.2 Graph API -->
-<h2 id="graph-api">6.2 Microsoft Graph API-communicatie</h2>
+<!-- 3.2 Graph API -->
+<h2 id="graph-api">3.2 Microsoft Graph API-communicatie</h2>
 
 <p>Alle communicatie met Microsoft 365 verloopt via de <strong>Microsoft Graph REST API</strong> (<code>https://graph.microsoft.com/v1.0</code>). De app maakt gebruik van de volgende endpoints:</p>
 
@@ -603,13 +358,13 @@
     </tr>
     <tr>
       <td><strong>403</strong> Forbidden</td>
-      <td>Geen herhaalpogingen; machtiging ontbreekt (zie sectie 3.2)</td>
+      <td>Geen herhaalpogingen; machtiging ontbreekt (zie sectie 6.2)</td>
     </tr>
   </tbody>
 </table>
 
-<!-- 6.3 Caching -->
-<h2 id="caching">6.3 Caching</h2>
+<!-- 3.3 Caching -->
+<h2 id="caching">3.3 Caching</h2>
 
 <p>De app cachet resultaten om het aantal API-aanroepen te beperken en de prestaties te verbeteren:</p>
 
@@ -646,29 +401,29 @@
 
 <hr class="section-divider">
 
-<!-- SECTIE 7: BEVEILIGING -->
-<h1 id="beveiliging">7. Beveiliging</h1>
+<!-- ============================================================
+     SECTIE 4: BEVEILIGING
+     ============================================================ -->
+<h1 id="beveiliging">4. Beveiliging</h1>
 
-<p>Dit hoofdstuk beschrijft de beveiligingsmaatregelen die de app implementeert om gebruikersgegevens en tokens te beschermen.</p>
-
-<!-- 7.1 Token-opslag -->
-<h2 id="token-opslag">7.1 Token-opslag en versleuteling</h2>
+<!-- 4.1 Token-opslag -->
+<h2 id="token-opslag">4.1 Token-opslag en versleuteling</h2>
 
 <table>
   <thead>
     <tr>
-      <th>Aspect</th>
-      <th>Implementatie</th>
+      <th>Gegeven</th>
+      <th>Opslagmethode</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td><strong>Access token</strong></td>
-      <td>Versleuteld opgeslagen met Nextcloud <code>ICrypto</code></td>
+      <td>Versleuteld opgeslagen met Nextcloud <code>ICrypto</code>, per gebruiker</td>
     </tr>
     <tr>
       <td><strong>Refresh token</strong></td>
-      <td>Versleuteld opgeslagen met Nextcloud <code>ICrypto</code></td>
+      <td>Versleuteld opgeslagen met Nextcloud <code>ICrypto</code>, per gebruiker</td>
     </tr>
     <tr>
       <td><strong>Client Secret</strong></td>
@@ -691,8 +446,8 @@
 
 <p>Bij het ophalen van instellingen via de admin-interface wordt het Client Secret <strong>gemaskeerd</strong> weergegeven (<code>********</code>). Het opslaan van een gemaskeerde waarde wordt automatisch genegeerd, zodat het bestaande secret niet overschreven wordt.</p>
 
-<!-- 7.2 Least Privilege -->
-<h2 id="least-privilege">7.2 Least privilege</h2>
+<!-- 4.2 Least Privilege -->
+<h2 id="least-privilege">4.2 Least privilege</h2>
 
 <p>De app is ontworpen volgens het <strong>principe van minimale rechten</strong>:</p>
 
@@ -727,8 +482,8 @@
   </tbody>
 </table>
 
-<!-- 7.3 Netwerk -->
-<h2 id="netwerk">7.3 Netwerkbeveiliging</h2>
+<!-- 4.3 Netwerk -->
+<h2 id="netwerk">4.3 Netwerkbeveiliging</h2>
 
 <table>
   <thead>
@@ -766,8 +521,8 @@
   <p>Er is geen inkomend verkeer van Microsoft nodig.</p>
 </div>
 
-<!-- 7.4 Foutafhandeling -->
-<h2 id="foutafhandeling">7.4 Foutafhandeling en logging</h2>
+<!-- 4.4 Foutafhandeling -->
+<h2 id="foutafhandeling">4.4 Foutafhandeling en logging</h2>
 
 <table>
   <thead>
@@ -802,7 +557,305 @@
 
 <hr class="section-divider">
 
-<!-- SECTIE 8: TROUBLESHOOTING -->
+<!-- ============================================================
+     SECTIE 5: VEREISTEN
+     ============================================================ -->
+<h1 id="vereisten">5. Vereisten</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>Component</th>
+      <th>Minimaal</th>
+      <th>Opmerking</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Nextcloud</strong></td>
+      <td>28</td>
+      <td>Ondersteund t/m versie 33</td>
+    </tr>
+    <tr>
+      <td><strong>PHP</strong></td>
+      <td>8.2</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td><strong>Microsoft Entra ID</strong></td>
+      <td>&mdash;</td>
+      <td>Een App Registration in uw Microsoft-tenant</td>
+    </tr>
+    <tr>
+      <td><strong>Netwerk</strong></td>
+      <td>&mdash;</td>
+      <td>Nextcloud-server moet <code>graph.microsoft.com</code> en <code>login.microsoftonline.com</code> kunnen bereiken (HTTPS, poort 443)</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr class="section-divider">
+
+<!-- ============================================================
+     SECTIE 6: AZURE SETUP
+     ============================================================ -->
+<h1 id="azure-setup">6. Microsoft Entra ID configuratie</h1>
+
+<p>Onderstaande stappen worden uitgevoerd door een <strong>Microsoft 365 beheerder</strong> met toegang tot de Azure Portal.</p>
+
+<!-- 6.1 App Registration -->
+<h2 id="app-registration">6.1 App Registration aanmaken</h2>
+
+<ol>
+  <li>Ga naar de <a href="https://portal.azure.com">Azure Portal</a></li>
+  <li>Navigeer naar <strong>Microsoft Entra ID</strong> &rarr; <strong>App registrations</strong> &rarr; <strong>New registration</strong></li>
+  <li>Vul de volgende gegevens in:</li>
+</ol>
+
+<table>
+  <thead>
+    <tr>
+      <th>Veld</th>
+      <th>Waarde</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Name</strong></td>
+      <td><code>Nextcloud Calendar Integration</code> (of een beschrijvende naam naar keuze)</td>
+    </tr>
+    <tr>
+      <td><strong>Supported account types</strong></td>
+      <td><em>Accounts in this organizational directory only</em> (Single tenant)</td>
+    </tr>
+    <tr>
+      <td><strong>Redirect URI</strong></td>
+      <td>Platform: <strong>Web</strong><br>URI: <code>https://&lt;uw-nextcloud-domein&gt;/apps/nc_ms365_calendar/oauth/callback</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-warning">
+  <p><strong>Belangrijk:</strong> De Redirect URI moet exact overeenkomen met het domein van uw Nextcloud-installatie. Vervang <code>&lt;uw-nextcloud-domein&gt;</code> door het werkelijke domein, bijvoorbeeld: <code>https://cloud.organisatie.nl/apps/nc_ms365_calendar/oauth/callback</code></p>
+</div>
+
+<ol start="4">
+  <li>Klik op <strong>Register</strong></li>
+</ol>
+
+<!-- 6.2 API Permissions -->
+<h2 id="api-permissions">6.2 API-machtigingen instellen</h2>
+
+<p>Na het aanmaken van de App Registration moeten de juiste API-machtigingen worden toegevoegd:</p>
+
+<ol>
+  <li>Ga naar uw App Registration &rarr; <strong>API permissions</strong> &rarr; <strong>Add a permission</strong></li>
+  <li>Kies <strong>Microsoft Graph</strong> &rarr; <strong>Delegated permissions</strong></li>
+  <li>Voeg de volgende machtigingen toe:</li>
+</ol>
+
+<table>
+  <thead>
+    <tr>
+      <th>Machtiging</th>
+      <th>Doel</th>
+      <th>Admin Consent</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>User.ReadBasic.All</strong></td>
+      <td>Gebruikers zoeken in de directory</td>
+      <td><span class="badge badge-warning">Vereist</span></td>
+    </tr>
+    <tr>
+      <td><strong>People.Read</strong></td>
+      <td>Relevante contacten ophalen</td>
+      <td><span class="badge badge-neutral">Nee</span></td>
+    </tr>
+    <tr>
+      <td><strong>Calendars.Read</strong></td>
+      <td>Free/busy informatie opvragen</td>
+      <td><span class="badge badge-neutral">Nee</span></td>
+    </tr>
+    <tr>
+      <td><strong>Calendars.Read.Shared</strong></td>
+      <td>Free/busy voor gedeelde agenda's</td>
+      <td><span class="badge badge-neutral">Nee</span></td>
+    </tr>
+    <tr>
+      <td><strong>offline_access</strong></td>
+      <td>Refresh tokens voor langdurige sessies</td>
+      <td><span class="badge badge-neutral">Nee</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<ol start="4">
+  <li>Klik op <strong>Grant admin consent for [uw organisatie]</strong></li>
+  <li>Bevestig met <strong>Yes</strong></li>
+</ol>
+
+<div class="callout">
+  <p><strong>Let op:</strong> De machtiging <code>User.ReadBasic.All</code> vereist admin consent. Zonder deze goedkeuring kunnen gebruikers geen MS365-collega's zoeken als deelnemers.</p>
+</div>
+
+<div class="toelichting">
+  <p><strong>Toelichting op de machtigingen:</strong> Alle machtigingen zijn van het type <em>Delegated</em>, wat betekent dat ze werken namens de ingelogde gebruiker. De app kan nooit meer doen dan waartoe de gebruiker zelf gemachtigd is. Er worden geen <em>Application</em>-machtigingen gebruikt. Zie ook sectie 4.2 (Least privilege).</p>
+</div>
+
+<!-- 6.3 Client Secret -->
+<h2 id="client-secret">6.3 Client Secret aanmaken</h2>
+
+<ol>
+  <li>Ga naar uw App Registration &rarr; <strong>Certificates &amp; secrets</strong></li>
+  <li>Klik op <strong>New client secret</strong></li>
+  <li>Voer een beschrijving in (bijv. <code>Nextcloud Calendar</code>) en kies een verlooptermijn</li>
+  <li><strong>Kopieer de secret value onmiddellijk</strong> &mdash; deze wordt slechts eenmaal weergegeven</li>
+</ol>
+
+<div class="callout callout-error">
+  <p><strong>Waarschuwing:</strong> De Client Secret wordt na het aanmaken slechts eenmaal getoond. Sla deze veilig op. Als u de waarde kwijtraakt, moet u een nieuwe secret aanmaken.</p>
+</div>
+
+<div class="toelichting">
+  <p><strong>Aanbeveling:</strong> Stel een herinnering in voor de verlooptermijn van het secret. Na verlopen moet een nieuw secret worden aangemaakt en in Nextcloud worden bijgewerkt. Een verlopen secret zorgt ervoor dat gebruikers hun MS365-account niet meer kunnen koppelen.</p>
+</div>
+
+<!-- 6.4 IDs noteren -->
+<h2 id="ids">6.4 Tenant ID en Client ID noteren</h2>
+
+<p>Ga naar uw App Registration &rarr; <strong>Overview</strong> en noteer de volgende waarden:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Veld</th>
+      <th>Waar te vinden</th>
+      <th>Voorbeeld</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Tenant ID</strong></td>
+      <td>Overview &rarr; Directory (tenant) ID</td>
+      <td><code>a1b2c3d4-e5f6-7890-abcd-ef1234567890</code></td>
+    </tr>
+    <tr>
+      <td><strong>Client ID</strong></td>
+      <td>Overview &rarr; Application (client) ID</td>
+      <td><code>12345678-abcd-efgh-ijkl-123456789012</code></td>
+    </tr>
+    <tr>
+      <td><strong>Client Secret</strong></td>
+      <td>Certificates &amp; secrets (stap 6.3)</td>
+      <td><code>uw-gekopieerde-secret-waarde</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-success">
+  <p><strong>Klaar!</strong> U heeft nu alle gegevens die nodig zijn voor de Nextcloud-configuratie: Tenant ID, Client ID en Client Secret.</p>
+</div>
+
+<hr class="section-divider">
+
+<!-- ============================================================
+     SECTIE 7: NEXTCLOUD CONFIGURATIE
+     ============================================================ -->
+<h1 id="nextcloud-config">7. Nextcloud configuratie</h1>
+
+<!-- 7.1 App installeren -->
+<h2 id="app-install">7.1 App installeren</h2>
+
+<p>De app wordt geinstalleerd door de Nextcloud-beheerder:</p>
+
+<ol>
+  <li>Kloon de repository in de Nextcloud <code>apps/</code> directory:
+    <div class="toelichting">
+      <p><code>cd /var/www/nextcloud/apps</code><br>
+      <code>git clone https://gitea.rikdekker.nl/sam/nc_ms365_calendar.git</code></p>
+    </div>
+  </li>
+  <li>Installeer dependencies en bouw de frontend:
+    <div class="toelichting">
+      <p><code>cd nc_ms365_calendar</code><br>
+      <code>composer install --no-dev</code><br>
+      <code>npm install</code><br>
+      <code>npm run build</code></p>
+    </div>
+  </li>
+  <li>Activeer de app:
+    <div class="toelichting">
+      <p><code>occ app:enable nc_ms365_calendar</code></p>
+    </div>
+  </li>
+</ol>
+
+<!-- 7.2 Beheerdersinstellingen -->
+<h2 id="admin-settings">7.2 Beheerdersinstellingen</h2>
+
+<p>Ga naar <strong>Beheer</strong> &rarr; <strong>Microsoft 365 Calendar Integration</strong> en vul de volgende velden in:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Veld</th>
+      <th>Waarde</th>
+      <th>Toelichting</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Tenant ID</strong></td>
+      <td>Uw Microsoft Entra ID Tenant ID</td>
+      <td>Zie stap 6.4</td>
+    </tr>
+    <tr>
+      <td><strong>Client ID</strong></td>
+      <td>Het Application (client) ID van uw App Registration</td>
+      <td>Zie stap 6.4</td>
+    </tr>
+    <tr>
+      <td><strong>Client Secret</strong></td>
+      <td>Het client secret van uw App Registration</td>
+      <td>Zie stap 6.3</td>
+    </tr>
+    <tr>
+      <td><strong>Cache TTL</strong></td>
+      <td>300 (standaard)</td>
+      <td>Hoe lang zoekresultaten gecachet worden in seconden (60&ndash;3600)</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Klik op <strong>Save</strong> om de instellingen op te slaan.</p>
+
+<div class="toelichting">
+  <p><strong>Redirect URI:</strong> Op de instellingenpagina wordt automatisch de juiste Redirect URI getoond. Controleer of deze overeenkomt met wat u in stap 6.1 heeft ingesteld in de Azure Portal.</p>
+</div>
+
+<!-- 7.3 Gebruikerskoppeling -->
+<h2 id="user-connection">7.3 Gebruikerskoppeling</h2>
+
+<p>Elke gebruiker koppelt zelf zijn/haar Microsoft 365-account:</p>
+
+<ol>
+  <li>Ga naar <strong>Persoonlijke instellingen</strong> &rarr; <strong>Microsoft 365 Calendar</strong></li>
+  <li>Klik op <strong>Connect to Microsoft 365</strong></li>
+  <li>Log in met uw Microsoft-account en verleen de gevraagde machtigingen</li>
+  <li>Na succesvolle koppeling wordt de status weergegeven</li>
+</ol>
+
+<div class="callout">
+  <p><strong>Let op:</strong> Gebruikers moeten individueel inloggen met hun eigen Microsoft 365-account. De app slaat per gebruiker een versleuteld OAuth-token op (zie sectie 4.1).</p>
+</div>
+
+<hr class="section-divider">
+
+<!-- ============================================================
+     SECTIE 8: TROUBLESHOOTING
+     ============================================================ -->
 <h1 id="troubleshooting">8. Probleemoplossing</h1>
 
 <table class="table-dark">
@@ -858,7 +911,7 @@
 </table>
 
 <div class="toelichting">
-  <p><strong>Logbestanden:</strong> Controleer de Nextcloud-logbestanden voor gedetailleerde foutmeldingen: <code>/var/www/nextcloud/data/nextcloud.log</code> of via <strong>Beheer</strong> &rarr; <strong>Logging</strong>.</p>
+  <p><strong>Logbestanden:</strong> Controleer de Nextcloud-logbestanden voor gedetailleerde foutmeldingen: <code>/var/www/nextcloud/data/nextcloud.log</code> of via <strong>Beheer</strong> &rarr; <strong>Logging</strong>. De app logt alleen technische details &mdash; nooit tokens of gevoelige gegevens (zie sectie 4.4).</p>
 </div>
 
 <hr class="section-divider">
