@@ -78,8 +78,10 @@ class MS365FreeBusyPlugin extends ServerPlugin {
 		$this->userSession = \OCP\Server::get(IUserSession::class);
 		$this->userManager = \OCP\Server::get(IUserManager::class);
 		$this->logger = \OCP\Server::get(LoggerInterface::class);
-		$this->cache = \OCP\Server::get(ICacheFactory::class)
-			->createDistributed(Application::APP_ID);
+		$cacheFactory = \OCP\Server::get(ICacheFactory::class);
+		$this->cache = $cacheFactory->isAvailable()
+			? $cacheFactory->createDistributed(Application::APP_ID)
+			: $cacheFactory->createLocal(Application::APP_ID);
 	}
 
 	public function getPluginName(): string {
@@ -222,11 +224,6 @@ class MS365FreeBusyPlugin extends ServerPlugin {
 		// Step 5: Write the merged response
 		$this->buildResponse($response, $existingResults);
 
-		$this->logger->debug('MS365FreeBusyPlugin: merged free/busy response', [
-			'app' => Application::APP_ID,
-			'resultCount' => count($existingResults),
-		]);
-
 		// Return false — we've already handled the full response
 		return false;
 	}
@@ -307,11 +304,6 @@ class MS365FreeBusyPlugin extends ServerPlugin {
 			],
 			'availabilityViewInterval' => 15,
 		];
-
-		$this->logger->debug('MS365FreeBusyPlugin: querying Graph API getSchedule', [
-			'app' => Application::APP_ID,
-			'count' => count($emails),
-		]);
 
 		$scheduleData = $this->graphClient->post($userId, '/me/calendar/getSchedule', $body);
 
@@ -412,6 +404,11 @@ class MS365FreeBusyPlugin extends ServerPlugin {
 			$this->parseAvailabilityView($vcalendar, $vfreebusy, $schedule['availabilityView'], $start);
 		}
 
+		// Add BUSY-UNAVAILABLE blocks for outside working hours
+		if (!empty($schedule['workingHours'])) {
+			$this->addWorkingHoursBlocks($vcalendar, $vfreebusy, $schedule['workingHours'], $start, $end);
+		}
+
 		$vcalendar->add($vfreebusy);
 		return $vcalendar;
 	}
@@ -464,6 +461,147 @@ class MS365FreeBusyPlugin extends ServerPlugin {
 	}
 
 	/**
+	 * Add BUSY-UNAVAILABLE blocks for times outside working hours.
+	 *
+	 * Graph API returns workingHours with daysOfWeek, startTime, endTime, and timeZone.
+	 * We generate BUSY-UNAVAILABLE periods for:
+	 * - Non-working days (e.g. weekends)
+	 * - Hours before startTime and after endTime on working days
+	 */
+	private function addWorkingHoursBlocks(
+		VCalendar $vcalendar,
+		mixed $vfreebusy,
+		array $workingHours,
+		DateTimeImmutable $rangeStart,
+		DateTimeImmutable $rangeEnd,
+	): void {
+		$daysOfWeek = $workingHours['daysOfWeek'] ?? [];
+		$startTime = $workingHours['startTime'] ?? '';
+		$endTime = $workingHours['endTime'] ?? '';
+		$tzName = $workingHours['timeZone']['name'] ?? '';
+
+		if (empty($daysOfWeek) || $startTime === '' || $endTime === '') {
+			return;
+		}
+
+		// Map MS timezone name to PHP timezone
+		$phpTz = $this->mapMsTimezone($tzName);
+		if ($phpTz === null) {
+			return;
+		}
+
+		// Map day names to PHP day-of-week numbers (1=Monday, 7=Sunday)
+		$dayMap = [
+			'monday' => 1, 'tuesday' => 2, 'wednesday' => 3,
+			'thursday' => 4, 'friday' => 5, 'saturday' => 6, 'sunday' => 7,
+		];
+		$workDays = [];
+		foreach ($daysOfWeek as $day) {
+			$num = $dayMap[strtolower($day)] ?? null;
+			if ($num !== null) {
+				$workDays[$num] = true;
+			}
+		}
+
+		// Parse start/end times (HH:MM:SS.0000000 format)
+		$workStart = substr($startTime, 0, 5); // "08:00"
+		$workEnd = substr($endTime, 0, 5);     // "17:00"
+
+		// Iterate over each day in the range
+		$tz = new DateTimeZone($phpTz);
+		$utc = new DateTimeZone('UTC');
+		$current = $rangeStart->setTimezone($tz)->modify('midnight');
+		$end = $rangeEnd->setTimezone($tz);
+
+		while ($current < $end) {
+			$dayOfWeek = (int)$current->format('N'); // 1=Mon, 7=Sun
+
+			if (!isset($workDays[$dayOfWeek])) {
+				// Non-working day: entire day is unavailable
+				$dayStart = $current->setTimezone($utc);
+				$dayEnd = $current->modify('+1 day')->setTimezone($utc);
+
+				if ($dayEnd > $rangeStart && $dayStart < $rangeEnd) {
+					$blockStart = max($dayStart, $rangeStart);
+					$blockEnd = min($dayEnd, $rangeEnd);
+					$freebusy = $vcalendar->createProperty(
+						'FREEBUSY',
+						$blockStart->format('Ymd\\THis\\Z') . '/' . $blockEnd->format('Ymd\\THis\\Z')
+					);
+					$freebusy['FBTYPE'] = 'BUSY-UNAVAILABLE';
+					$vfreebusy->add($freebusy);
+				}
+			} else {
+				// Working day: before work start and after work end
+				$workStartDt = new DateTimeImmutable($current->format('Y-m-d') . ' ' . $workStart, $tz);
+				$workEndDt = new DateTimeImmutable($current->format('Y-m-d') . ' ' . $workEnd, $tz);
+
+				// Before working hours: midnight → workStart
+				$beforeStart = $current->setTimezone($utc);
+				$beforeEnd = $workStartDt->setTimezone($utc);
+				if ($beforeEnd > $beforeStart && $beforeEnd > $rangeStart && $beforeStart < $rangeEnd) {
+					$blockStart = max($beforeStart, $rangeStart);
+					$blockEnd = min($beforeEnd, $rangeEnd);
+					$freebusy = $vcalendar->createProperty(
+						'FREEBUSY',
+						$blockStart->format('Ymd\\THis\\Z') . '/' . $blockEnd->format('Ymd\\THis\\Z')
+					);
+					$freebusy['FBTYPE'] = 'BUSY-UNAVAILABLE';
+					$vfreebusy->add($freebusy);
+				}
+
+				// After working hours: workEnd → midnight
+				$afterStart = $workEndDt->setTimezone($utc);
+				$afterEnd = $current->modify('+1 day')->setTimezone($utc);
+				if ($afterEnd > $afterStart && $afterEnd > $rangeStart && $afterStart < $rangeEnd) {
+					$blockStart = max($afterStart, $rangeStart);
+					$blockEnd = min($afterEnd, $rangeEnd);
+					$freebusy = $vcalendar->createProperty(
+						'FREEBUSY',
+						$blockStart->format('Ymd\\THis\\Z') . '/' . $blockEnd->format('Ymd\\THis\\Z')
+					);
+					$freebusy['FBTYPE'] = 'BUSY-UNAVAILABLE';
+					$vfreebusy->add($freebusy);
+				}
+			}
+
+			$current = $current->modify('+1 day');
+		}
+	}
+
+	/**
+	 * Map Microsoft timezone names to PHP timezone identifiers.
+	 */
+	private function mapMsTimezone(string $msName): ?string {
+		// Common MS timezone → PHP timezone mapping
+		$map = [
+			'Pacific Standard Time' => 'America/Los_Angeles',
+			'Mountain Standard Time' => 'America/Denver',
+			'Central Standard Time' => 'America/Chicago',
+			'Eastern Standard Time' => 'America/New_York',
+			'GMT Standard Time' => 'Europe/London',
+			'Greenwich Standard Time' => 'Atlantic/Reykjavik',
+			'W. Europe Standard Time' => 'Europe/Berlin',
+			'Central European Standard Time' => 'Europe/Warsaw',
+			'Romance Standard Time' => 'Europe/Paris',
+			'Central Europe Standard Time' => 'Europe/Budapest',
+			'E. Europe Standard Time' => 'Europe/Chisinau',
+			'FLE Standard Time' => 'Europe/Kiev',
+			'GTB Standard Time' => 'Europe/Bucharest',
+			'Russian Standard Time' => 'Europe/Moscow',
+			'AUS Eastern Standard Time' => 'Australia/Sydney',
+			'Tokyo Standard Time' => 'Asia/Tokyo',
+			'China Standard Time' => 'Asia/Shanghai',
+			'India Standard Time' => 'Asia/Kolkata',
+			'Singapore Standard Time' => 'Asia/Singapore',
+			'New Zealand Standard Time' => 'Pacific/Auckland',
+			'UTC' => 'UTC',
+		];
+
+		return $map[$msName] ?? null;
+	}
+
+	/**
 	 * Build an empty VFREEBUSY (all free) for an email.
 	 */
 	private function buildEmptyFreeBusy(string $email, DateTimeImmutable $start, DateTimeImmutable $end): string {
@@ -483,20 +621,40 @@ class MS365FreeBusyPlugin extends ServerPlugin {
 	 * @param array<string, array{status: string, calendar-data?: string}> $results
 	 */
 	private function buildResponse(ResponseInterface $response, array $results): void {
-		$xml = '<?xml version="1.0" encoding="utf-8"?>' . "\n";
-		$xml .= '<C:schedule-response xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">' . "\n";
+		$dom = new \DOMDocument('1.0', 'utf-8');
+		$dom->formatOutput = false;
+
+		$scheduleResponse = $dom->createElement('cal:schedule-response');
+		$scheduleResponse->setAttribute('xmlns:D', 'DAV:');
+		$scheduleResponse->setAttribute('xmlns:cal', 'urn:ietf:params:xml:ns:caldav');
+		$dom->appendChild($scheduleResponse);
 
 		foreach ($results as $email => $result) {
-			$xml .= '  <C:response>' . "\n";
-			$xml .= '    <C:recipient><D:href>mailto:' . htmlspecialchars($email) . '</D:href></C:recipient>' . "\n";
-			$xml .= '    <C:request-status>' . htmlspecialchars($result['status']) . '</C:request-status>' . "\n";
+			$xresponse = $dom->createElement('cal:response');
+
+			$recipient = $dom->createElement('cal:recipient');
+			$href = $dom->createElement('D:href');
+			$href->appendChild($dom->createTextNode('mailto:' . $email));
+			$recipient->appendChild($href);
+			$xresponse->appendChild($recipient);
+
+			$status = $dom->createElement('cal:request-status');
+			$status->appendChild($dom->createTextNode($result['status']));
+			$xresponse->appendChild($status);
+
 			if (isset($result['calendar-data'])) {
-				$xml .= '    <C:calendar-data>' . htmlspecialchars($result['calendar-data']) . '</C:calendar-data>' . "\n";
+				$calendarData = $dom->createElement('cal:calendar-data');
+				// Normalize line endings to \n, matching Sabre's built-in behavior
+				$calendarData->appendChild($dom->createTextNode(
+					str_replace("\r\n", "\n", $result['calendar-data'])
+				));
+				$xresponse->appendChild($calendarData);
 			}
-			$xml .= '  </C:response>' . "\n";
+
+			$scheduleResponse->appendChild($xresponse);
 		}
 
-		$xml .= '</C:schedule-response>';
+		$xml = $dom->saveXML();
 
 		$response->setStatus(200);
 		$response->setHeader('Content-Type', 'application/xml');

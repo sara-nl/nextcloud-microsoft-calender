@@ -92,13 +92,22 @@ class TokenService {
      */
     public function getConnectionStatus(string $userId): array {
         $connected = $this->isConnected($userId);
+
+        // Auto-refresh expired token so the UI doesn't show a stale warning
+        $tokenExpired = false;
+        if ($connected && $this->isTokenExpired($userId)) {
+            $this->refresh($userId);
+            $tokenExpired = $this->isTokenExpired($userId);
+            $connected = $this->isConnected($userId);
+        }
+
         return [
             'connected' => $connected,
             'email' => $connected ? $this->getUserEmail($userId) : '',
             'connectedAt' => $connected ? (int)$this->config->getUserValue(
                 $userId, Application::APP_ID, 'connected_at', '0'
             ) : 0,
-            'tokenExpired' => $connected && $this->isTokenExpired($userId),
+            'tokenExpired' => $tokenExpired,
         ];
     }
 
