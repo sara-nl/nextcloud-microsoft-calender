@@ -16,8 +16,6 @@ use Psr\Log\LoggerInterface;
 class MsGraphAddressBook implements IAddressBook {
     private const CACHE_PREFIX = 'ms365:search:';
     private const CACHE_TTL = 300; // 5 minutes default
-    private const PHOTO_CACHE_PREFIX = 'ms365:photo:';
-    private const PHOTO_CACHE_TTL = 86400; // 24 hours
 
     private ?ICache $cache;
 
@@ -220,11 +218,6 @@ class MsGraphAddressBook implements IAddressBook {
             'isLocalSystemBook' => true,
         ];
 
-        $photo = $this->getPhoto($userId, $person['id'] ?? '');
-        if ($photo !== null) {
-            $contact['PHOTO'] = $photo;
-        }
-
         return $contact;
     }
 
@@ -240,33 +233,7 @@ class MsGraphAddressBook implements IAddressBook {
             'isLocalSystemBook' => true,
         ];
 
-        $photo = $this->getPhoto($userId, $user['id'] ?? '');
-        if ($photo !== null) {
-            $contact['PHOTO'] = $photo;
-        }
-
         return $contact;
     }
 
-    /**
-     * Get profile photo with caching.
-     */
-    private function getPhoto(string $userId, string $msUserId): ?string {
-        if ($msUserId === '') {
-            return null;
-        }
-
-        $cacheKey = self::PHOTO_CACHE_PREFIX . $msUserId;
-        $cached = $this->cache?->get($cacheKey);
-        if ($cached !== null) {
-            return $cached === '' ? null : $cached;
-        }
-
-        $photo = $this->graphClient->getProfilePhoto($userId, $msUserId);
-
-        // Cache even empty result to avoid repeated failed requests
-        $this->cache?->set($cacheKey, $photo ?? '', self::PHOTO_CACHE_TTL);
-
-        return $photo;
-    }
 }

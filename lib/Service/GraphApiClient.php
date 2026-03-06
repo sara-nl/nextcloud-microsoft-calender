@@ -42,37 +42,6 @@ class GraphApiClient {
     }
 
     /**
-     * Get a user's profile photo as a base64 data URI.
-     */
-    public function getProfilePhoto(string $userId, string $msUserId): ?string {
-        $token = $this->tokenService->getAccessToken($userId);
-        if ($token === '') {
-            return null;
-        }
-
-        $url = self::BASE_URL . "/users/{$msUserId}/photo/\$value";
-
-        try {
-            $client = $this->clientService->newClient();
-            $response = $client->get($url, [
-                'headers' => [
-                    'Authorization' => "Bearer {$token}",
-                ],
-            ]);
-
-            $contentType = $response->getHeader('Content-Type');
-            $imageData = $response->getBody();
-            return "data:{$contentType};base64," . base64_encode($imageData);
-        } catch (\Exception $e) {
-            $this->logger->debug('Could not fetch profile photo', [
-                'app' => Application::APP_ID,
-                'statusCode' => $this->getStatusCode($e),
-            ]);
-            return null;
-        }
-    }
-
-    /**
      * Execute a Graph API request with retry logic.
      */
     private function request(string $userId, string $method, string $endpoint, array $options): ?array {
