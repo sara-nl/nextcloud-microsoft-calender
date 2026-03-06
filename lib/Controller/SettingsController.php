@@ -17,6 +17,7 @@ class SettingsController extends Controller {
         'client_secret',
         'auth_method',
         'cache_ttl',
+        'reply_notifications_enabled',
     ];
 
     private const SENSITIVE_KEYS = [
@@ -41,6 +42,10 @@ class SettingsController extends Controller {
                 $settings[$key] = $this->appConfig->getValueInt(Application::APP_ID, $key, 300);
                 continue;
             }
+            if ($key === 'reply_notifications_enabled') {
+                $settings[$key] = $this->appConfig->getValueBool(Application::APP_ID, $key, false);
+                continue;
+            }
             $lazy = in_array($key, self::SENSITIVE_KEYS, true);
             $value = $this->appConfig->getValueString(Application::APP_ID, $key, lazy: $lazy);
             if ($lazy && $value !== '') {
@@ -62,8 +67,8 @@ class SettingsController extends Controller {
                 continue;
             }
 
-            // Don't overwrite secret with masked value
-            if (in_array($key, self::SENSITIVE_KEYS, true) && preg_match('/^\*+$/', $value)) {
+            // Don't overwrite secret with masked or empty value
+            if (in_array($key, self::SENSITIVE_KEYS, true) && ($value === '' || preg_match('/^\*+$/', $value))) {
                 continue;
             }
 
@@ -74,6 +79,10 @@ class SettingsController extends Controller {
             } elseif ($key === 'cache_ttl') {
                 $this->appConfig->setValueInt(
                     Application::APP_ID, $key, (int)$value
+                );
+            } elseif ($key === 'reply_notifications_enabled') {
+                $this->appConfig->setValueBool(
+                    Application::APP_ID, $key, (bool)$value
                 );
             } else {
                 $this->appConfig->setValueString(

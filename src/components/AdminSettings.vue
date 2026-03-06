@@ -52,6 +52,19 @@
 				<p class="hint">How long search results are cached (default: 300s).</p>
 			</div>
 
+			<div class="ms365-form-row ms365-checkbox-row">
+				<input
+					id="ms365-reply-notifications"
+					v-model="replyNotificationsEnabled"
+					type="checkbox"
+					class="checkbox"
+					@change="markDirty">
+				<label for="ms365-reply-notifications">Enable calendar reply notifications</label>
+				<p class="hint">
+					Send Nextcloud notifications when attendees accept, decline or tentatively accept calendar invitations.
+				</p>
+			</div>
+
 			<div class="ms365-form-actions">
 				<button
 					class="primary"
@@ -94,6 +107,7 @@ export default {
 			clientSecret: '',
 			clientSecretSet: false,
 			cacheTtl: 300,
+			replyNotificationsEnabled: false,
 			saving: false,
 			saved: false,
 			dirty: false,
@@ -113,6 +127,7 @@ export default {
 				this.clientId = response.data.client_id || ''
 				this.clientSecretSet = response.data.client_secret === '********'
 				this.cacheTtl = parseInt(response.data.cache_ttl, 10) || 300
+				this.replyNotificationsEnabled = !!response.data.reply_notifications_enabled
 			} catch (e) {
 				this.error = 'Failed to load settings'
 			}
@@ -132,6 +147,7 @@ export default {
 					client_id: this.clientId,
 					client_secret: this.clientSecret,
 					cache_ttl: this.cacheTtl,
+					reply_notifications_enabled: this.replyNotificationsEnabled,
 				})
 				this.saved = true
 				this.dirty = false
@@ -173,6 +189,23 @@ export default {
 	color: var(--color-text-lighter);
 	font-size: 0.9em;
 	margin-top: 4px;
+}
+
+.ms365-checkbox-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.ms365-checkbox-row label {
+	font-weight: normal !important;
+	margin-bottom: 0 !important;
+}
+
+.ms365-checkbox-row .hint {
+	flex-basis: 100%;
+	margin-top: 0;
 }
 
 .ms365-form-actions {
