@@ -6,6 +6,7 @@ Integrate Microsoft 365 users into the Nextcloud Calendar with attendee search a
 
 - **Attendee Search** — Search Microsoft 365 users when adding attendees to calendar events
 - **Free/Busy** — View availability of MS365 users directly in Nextcloud Calendar
+- **Reply Notifications** — Get notified when attendees accept, decline or tentatively accept invitations
 - **OAuth2 with PKCE** — Secure per-user authentication with Microsoft Entra ID
 
 ## Requirements
@@ -19,7 +20,7 @@ Integrate Microsoft 365 users into the Nextcloud Calendar with attendee search a
 1. Clone or download this repository into your Nextcloud `apps/` directory:
    ```bash
    cd /var/www/nextcloud/apps
-   git clone https://gitea.rikdekker.nl/sam/nc_ms365_calendar.git
+   git clone https://github.com/sara-nl/nextcloud-microsoft-calender.git nc_ms365_calendar
    ```
 
 2. Install dependencies and build the frontend:
@@ -80,6 +81,7 @@ Go to **Administration settings** → **Microsoft 365 Calendar Integration** and
 - **Client ID**
 - **Client Secret**
 - **Cache TTL** — How long search results are cached (default: 300s)
+- **Reply Notifications** — Send notifications when attendees respond to invitations (toggle on/off)
 
 ### User Connection
 
@@ -116,6 +118,10 @@ Status mapping:
 | `tentative` | `BUSY-TENTATIVE` |
 | `oof` (Out of Office) | `BUSY-UNAVAILABLE` |
 | `workingElsewhere` | `BUSY-TENTATIVE` |
+
+### Reply Notifications
+
+When enabled in admin settings, the app monitors calendar event updates for PARTSTAT changes (accept/decline/tentative) and sends Nextcloud notifications to the event organizer.
 
 ## Development
 
